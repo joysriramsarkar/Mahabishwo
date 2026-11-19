@@ -1,0 +1,2870 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>আকাশগঙ্গা ছায়াপথ — মাল্টি-স্কেল ৩ডি মহাবৈশ্বিক মডেল (Milky Way to Earth & Exoplanets)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #02030a;
+      font-family: 'Hind Siliguri', 'Inter', system-ui, -apple-system, sans-serif;
+      color: #e8eefc;
+      user-select: none;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+    #canvas-container:active { cursor: grabbing; }
+    #labels-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10;
+    }
+    .glass-panel {
+      background: rgba(7, 12, 28, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 180, 255, 0.18);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+    .landmark-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 4px 7px;
+      border-radius: 9999px;
+      background: rgba(5, 10, 24, 0.84);
+      border: 1px solid rgba(165, 198, 255, 0.36);
+      color: #edf3ff;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.2s ease;
+      backdrop-filter: blur(6px);
+    }
+    .landmark-pin:hover,
+    .landmark-pin.active {
+      background: rgba(30, 58, 138, 0.92);
+      border-color: rgba(147, 197, 253, 0.95);
+      transform: translate(-50%, -50%) scale(1.07);
+      z-index: 25;
+    }
+    .pin-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      flex-shrink: 0;
+      box-shadow: 0 0 10px currentColor;
+    }
+    .pin-dot.pulse {
+      animation: cosmicPulse 2s infinite ease-in-out;
+    }
+    @keyframes cosmicPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.45); opacity: 0.65; }
+    }
+    .view-pill {
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .view-pill.active {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.45), rgba(139, 92, 246, 0.45));
+      border-color: rgba(147, 197, 253, 0.8);
+      color: #ffffff;
+      box-shadow: 0 0 18px rgba(96, 165, 250, 0.32);
+    }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 999px; }
+    input[type="range"] { accent-color: #60a5fa; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    #transition-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      background: radial-gradient(circle at center, rgba(147, 197, 253, 0.22), rgba(2, 4, 15, 0.85));
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container" role="application" aria-label="আকাশগঙ্গা ছায়াপথ, সৌরজগৎ, পৃথিবী ও অন্যান্য তারামণ্ডলের ৩ডি মহাবৈশ্বিক মডেল"></div>
+
+  <!-- Warp Transition Overlay -->
+  <div id="transition-flash"></div>
+
+  <!-- Projected 3D Landmark & Planet Labels -->
+  <div id="labels-layer"></div>
+
+  <!-- WebGL Fallback Notice -->
+  <div id="webgl-fallback" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/95">
+    <div class="glass-panel max-w-md rounded-2xl p-6 text-center">
+      <h2 class="text-xl font-bold text-blue-200 mb-2">৩ডি গ্রাফিক্স চালু করা যায়নি</h2>
+      <p class="text-sm text-slate-300">আপনার ব্রাউজারে WebGL সমর্থন পাওয়া যায়নি। আধুনিক ব্রাউজারে হার্ডওয়্যার অ্যাক্সিলারেশন চালু করে আবার চেষ্টা করুন।</p>
+    </div>
+  </div>
+
+  <!-- Top HUD Bar -->
+  <header class="fixed top-3 left-3 right-3 z-30 flex items-start justify-between gap-2 pointer-events-none">
+    <!-- Title, Cosmic Depth Breadcrumb & Telemetry -->
+    <div class="glass-panel pointer-events-auto rounded-2xl px-3.5 py-2.5 max-w-[74vw] sm:max-w-lg">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/30 shrink-0">
+          ✦
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-sm sm:text-base font-bold tracking-tight text-white leading-tight truncate">
+              আকাশগঙ্গা মহাবৈশ্বিক মডেল
+            </h1>
+            <span id="scale-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/25 border border-blue-400/40 text-blue-200">
+              ছায়াপথ স্তর
+            </span>
+          </div>
+          <!-- Clickable Multi-Scale Breadcrumb -->
+          <div id="cosmic-breadcrumb" class="mt-0.5 flex items-center gap-1 text-[11px] text-slate-300 flex-wrap">
+            <button type="button" id="crumb-galaxy" class="hover:text-white text-blue-300 font-medium transition">আকাশগঙ্গা ছায়াপথ</button>
+            <span id="crumb-sep-1" class="hidden text-slate-500">›</span>
+            <button type="button" id="crumb-system" class="hidden hover:text-white text-amber-200 font-medium transition"></button>
+            <span id="crumb-sep-2" class="hidden text-slate-500">›</span>
+            <span id="crumb-planet" class="hidden text-emerald-300 font-semibold"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Telemetry Row -->
+      <div class="mt-2 pt-1.5 border-t border-white/10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-300">
+        <div class="flex items-center gap-1.5" title="গ্যালাকটিক সময়">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>
+          <span>সময়: <strong id="galactic-time-myr" class="text-amber-200 font-semibold">০.০</strong> <span id="time-unit-label">মিলিয়ন বছর</span></span>
+          <span id="galactic-years-wrap" class="text-slate-400">(<span id="galactic-years">০.০০</span> গ্যালাকটিক বছর)</span>
+        </div>
+        <div class="flex items-center gap-1.5" title="বর্তমান দূরত্ব স্কেল">
+          <span class="inline-block h-[2px] w-7 bg-blue-300/80 relative">
+            <span class="absolute left-0 -top-1 w-[1.5px] h-2.5 bg-blue-300/80"></span>
+            <span class="absolute right-0 -top-1 w-[1.5px] h-2.5 bg-blue-300/80"></span>
+          </span>
+          <span id="scale-readout" class="text-blue-200 font-medium">~২৫,০০০ আলোকবর্ষ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Right Action Buttons -->
+    <div class="glass-panel pointer-events-auto rounded-2xl p-1.5 flex items-center gap-1 shrink-0">
+      <button id="btn-zoom-out-level" type="button" title="এক ধাপ বাইরে জুম আউট করুন"
+        class="hidden px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 text-amber-200 hover:bg-amber-500/35 border border-amber-400/35 transition flex items-center gap-1">
+        <span>↖</span>
+        <span class="hidden sm:inline">পেছনে</span>
+      </button>
+      <button id="btn-sound" type="button" title="মহাবিশ্বের আবহ শব্দ চালু/বন্ধ করুন"
+        class="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-1.5">
+        <span id="sound-icon">🔇</span>
+        <span class="hidden md:inline">শব্দ</span>
+      </button>
+      <button id="btn-toggle-controls" type="button" title="নিয়ন্ত্রণ প্যানেল"
+        class="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1.5">
+        <span>⚙️</span>
+        <span class="hidden sm:inline">নিয়ন্ত্রণ</span>
+      </button>
+      <button id="btn-toggle-info" type="button" title="তথ্য কার্ড"
+        class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-blue-500/25 text-blue-100 hover:bg-blue-500/35 border border-blue-400/30 transition flex items-center gap-1.5">
+        <span>ℹ️</span>
+        <span class="hidden sm:inline">তথ্য</span>
+      </button>
+      <button id="btn-reset-view" type="button" title="ছায়াপথ দৃশ্যে ফিরে যান"
+        class="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition">
+        ↺
+      </button>
+    </div>
+  </header>
+
+  <!-- Left Collapsible Controls Drawer -->
+  <aside id="controls-drawer"
+    class="glass-panel fixed top-[112px] left-3 z-20 w-[272px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-200px)] overflow-y-auto custom-scroll rounded-2xl p-4 transition-all duration-300 hidden">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-white flex items-center gap-1.5">
+        <span>🎛️</span> সিমুলেশন ও স্তর নিয়ন্ত্রণ
+      </h2>
+      <button id="btn-close-controls" type="button" class="text-slate-400 hover:text-white text-sm px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+    </div>
+
+    <!-- Play/Pause & Rotation Speed -->
+    <div class="space-y-3 pb-3.5 border-b border-white/10">
+      <div class="flex items-center justify-between gap-2">
+        <button id="btn-play-pause" type="button"
+          class="flex-1 py-1.5 px-3 rounded-xl bg-blue-500/25 hover:bg-blue-500/40 border border-blue-400/35 text-xs font-semibold text-blue-100 transition flex items-center justify-center gap-1.5">
+          <span id="play-icon">⏸</span>
+          <span id="play-label">ঘূর্ণন বিরতি</span>
+        </button>
+        <button id="btn-reset-clock" type="button" title="সময় শূন্য করুন"
+          class="py-1.5 px-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs text-slate-300 transition">
+          ০
+        </button>
+      </div>
+
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-300">ঘূর্ণন ও কক্ষপথ গতি</span>
+          <span id="speed-value" class="text-blue-300 font-semibold">১.০x</span>
+        </div>
+        <input id="speed-slider" type="range" min="0" max="4" step="0.1" value="1"
+          class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+      </div>
+    </div>
+
+    <!-- Layer Toggles -->
+    <div class="py-3.5 border-b border-white/10 space-y-2.5">
+      <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">মহাবৈশ্বিক স্তরসমূহ</p>
+
+      <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
+        <span>সর্পিল বাহু ও নক্ষত্র</span>
+        <input id="toggle-stars" type="checkbox" checked class="w-4 h-4 rounded accent-blue-400 cursor-pointer" />
+      </label>
+
+      <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
+        <span>নীহারিকা ও মহাজাগতিক ধূলিকণা</span>
+        <input id="toggle-nebulae" type="checkbox" checked class="w-4 h-4 rounded accent-pink-400 cursor-pointer" />
+      </label>
+
+      <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
+        <span>কক্ষপথ ও বাসযোগ্য অঞ্চল</span>
+        <input id="toggle-orbit" type="checkbox" checked class="w-4 h-4 rounded accent-amber-400 cursor-pointer" />
+      </label>
+
+      <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
+        <span>৩ডি লেবেল ও পিন</span>
+        <input id="toggle-labels" type="checkbox" checked class="w-4 h-4 rounded accent-cyan-400 cursor-pointer" />
+      </label>
+
+      <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
+        <span>ডার্ক ম্যাটার হ্যালো</span>
+        <input id="toggle-halo" type="checkbox" class="w-4 h-4 rounded accent-violet-400 cursor-pointer" />
+      </label>
+    </div>
+
+    <!-- Star Density Selector -->
+    <div class="pt-3.5">
+      <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">ছায়াপথের নক্ষত্র ঘনত্ব</p>
+      <div class="grid grid-cols-3 gap-1.5" id="density-group">
+        <button type="button" data-density="low"
+          class="density-btn py-1.5 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 transition">
+          হালকা
+        </button>
+        <button type="button" data-density="medium"
+          class="density-btn py-1.5 rounded-xl text-xs font-medium bg-blue-500/30 border border-blue-400/60 text-white transition">
+          মাঝারি
+        </button>
+        <button type="button" data-density="high"
+          class="density-btn py-1.5 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 transition">
+          ঘন
+        </button>
+      </div>
+      <p class="mt-2.5 text-[11px] text-slate-400 leading-relaxed">
+        ছায়াপথ থেকে জুম ইন করে সরাসরি সৌরজগৎ ও পৃথিবী পর্যন্ত প্রবেশ করা যায়, অথবা যেকোনো তারামণ্ডল ও গ্রহে ক্লিক করে পরিষ্কার ৩ডি ক্লোজ-আপ দেখা যায়।
+      </p>
+    </div>
+  </aside>
+
+  <!-- Right Collapsible Info & Explorer Panel -->
+  <aside id="info-panel"
+    class="glass-panel fixed top-[112px] right-3 z-20 w-[320px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-200px)] overflow-y-auto custom-scroll rounded-2xl p-4 transition-all duration-300">
+    <div class="flex items-center justify-between mb-2">
+      <span id="explorer-heading" class="text-[11px] font-semibold uppercase tracking-wider text-blue-300/90">মহাবৈশ্বিক অন্বেষণ</span>
+      <button id="btn-close-info" type="button" class="text-slate-400 hover:text-white text-sm px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+    </div>
+
+    <!-- Context-aware Quick Chips (Galaxy regions / Planets in active star system) -->
+    <div id="region-chips" class="flex flex-wrap gap-1.5 mb-3.5 pb-3 border-b border-white/10"></div>
+
+    <!-- Active Detail Content -->
+    <div id="info-content">
+      <div class="flex items-center gap-2 mb-1.5">
+        <span id="info-badge" class="inline-block w-2.5 h-2.5 rounded-full bg-blue-400 shadow"></span>
+        <span id="info-subtitle" class="text-[11px] font-medium text-blue-200/85"></span>
+      </div>
+      <h2 id="info-title" class="text-lg font-bold text-white leading-snug mb-2"></h2>
+      <p id="info-desc" class="text-xs sm:text-[13px] text-slate-200/90 leading-relaxed mb-3.5"></p>
+
+      <!-- Action Button (e.g., Enter Star System / Zoom to Earth / Back to System) -->
+      <div id="info-action-wrap" class="mb-3.5 hidden">
+        <button id="info-action-btn" type="button"
+          class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-500 hover:to-indigo-500 border border-blue-300/40 text-xs font-semibold text-white shadow-lg shadow-blue-900/40 transition flex items-center justify-center gap-1.5">
+        </button>
+      </div>
+
+      <!-- Key Metrics Grid -->
+      <div id="info-stats" class="grid grid-cols-2 gap-2 mb-3.5"></div>
+
+      <!-- Source Link -->
+      <div class="pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+        <span>তথ্যসূত্র:</span>
+        <a id="info-source-link" href="https://science.nasa.gov/universe/galaxies/" target="_blank" rel="noopener noreferrer"
+          class="text-blue-300 hover:text-blue-200 underline underline-offset-2 truncate max-w-[210px]">
+          NASA Science ↗
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Floating Multi-Scale Navigation Bar -->
+  <nav class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100vw-16px)]">
+    <div class="glass-panel rounded-2xl p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
+      <button type="button" data-preset="overview"
+        class="view-pill active px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-slate-200 hover:bg-white/10">
+        🌌 তির্যক দৃশ্য
+      </button>
+      <button type="button" data-preset="top"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-slate-200 hover:bg-white/10">
+        🧭 সর্পিল মানচিত্র
+      </button>
+      <button type="button" data-preset="edge"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-slate-200 hover:bg-white/10">
+        🛸 পার্শ্বদৃশ্য
+      </button>
+      <button type="button" data-preset="core"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-slate-200 hover:bg-white/10">
+        🕳️ ব্ল্যাক হোল কেন্দ্র
+      </button>
+      <span class="w-px h-5 bg-white/15 mx-0.5 shrink-0"></span>
+      <button type="button" data-preset="solar"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-semibold text-amber-200 hover:bg-amber-500/20">
+        ☀️ সৌরজগৎ
+      </button>
+      <button type="button" data-preset="earth"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20">
+        🌍 পৃথিবী (HD)
+      </button>
+      <button type="button" data-preset="proxima"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-rose-200 hover:bg-rose-500/20">
+        🔴 প্রক্সিমা b
+      </button>
+      <button type="button" data-preset="trappist"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-purple-200 hover:bg-purple-500/20">
+        🪐 ট্র্যাপিস্ট-১
+      </button>
+      <button type="button" data-preset="kepler186"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-cyan-200 hover:bg-cyan-500/20">
+        💠 কেপলার-১৮৬f
+      </button>
+      <span class="w-px h-5 bg-white/15 mx-0.5 shrink-0"></span>
+      <button type="button" data-preset="halo"
+        class="view-pill px-3 py-1.5 rounded-xl border border-transparent text-xs font-medium text-slate-200 hover:bg-white/10">
+        🫧 হ্যালো ও প্রতিবেশী
+      </button>
+    </div>
+  </nav>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. GROUNDED ASTRONOMICAL DATASETS (NASA Science, NASA JPL, RMG, Wikipedia)
+      // =========================================================================
+      const GALAXY_LANDMARKS = [
+        {
+          id: 'milkyway',
+          shortLabel: 'আকাশগঙ্গা',
+          pinLabel: '',
+          title: 'আকাশগঙ্গা ছায়াপথ (Milky Way)',
+          subtitle: 'দণ্ডাকৃতি সর্পিল ছায়াপথ • আমাদের মহাবৈশ্বিক ঠিকানা',
+          color: '#93c5fd',
+          position: [0, 0, 0],
+          camera: { theta: 0.55, phi: 0.96, radius: 112, target: [0, 0, 0] },
+          description:
+            'আকাশগঙ্গা আমাদের বাসস্থান—একটি বিশাল দণ্ডাকৃতি সর্পিল (Barred Spiral) ছায়াপথ। যেকোনো তারামণ্ডলে (যেমন সৌরজগৎ, প্রক্সিমা সেন্টরি, ট্র্যাপিস্ট-১ বা কেপলার-১৮৬) ক্লিক করে অথবা জুম ইন করে সরাসরি সেই নক্ষত্রমণ্ডল ও তার গ্রহগুলোকে পরিষ্কার ৩ডি রূপে দেখা যাবে।',
+          stats: [
+            { label: 'ব্যাস', value: 'প্রায় ১,০০,০০০ আলোকবর্ষ' },
+            { label: 'নক্ষত্র সংখ্যা', value: '১০০–৪০০ বিলিয়ন' },
+            { label: 'ডিস্কের পুরুত্ব', value: 'প্রায় ১,০০০ আলোকবর্ষ' },
+            { label: 'বয়স', value: 'প্রায় ১৩.৬ বিলিয়ন বছর' }
+          ],
+          actionLabel: '☀️ আমাদের সৌরজগতে প্রবেশ করুন',
+          actionType: 'enterSystem',
+          actionTarget: 'solar',
+          sourceName: 'NASA Science — Galaxies',
+          sourceUrl: 'https://science.nasa.gov/universe/galaxies/'
+        },
+        {
+          id: 'core',
+          shortLabel: 'স্যাজিটেরিয়াস এ*',
+          pinLabel: 'স্যাজিটেরিয়াস এ* (কেন্দ্র)',
+          title: 'স্যাজিটেরিয়াস এ* ও কেন্দ্রীয় স্ফীতি',
+          subtitle: 'Sagittarius A* • সুপারম্যাসিভ ব্ল্যাক হোল',
+          color: '#fbbf24',
+          position: [0, 0, 0],
+          camera: { theta: 0.45, phi: 1.18, radius: 18, target: [0, 0, 0] },
+          description:
+            'আকাশগঙ্গার একদম কেন্দ্রে রয়েছে অতিভারী ব্ল্যাক হোল স্যাজিটেরিয়াস এ* (Sagittarius A*)। এর চারপাশে প্রায় ১০,০০০ আলোকবর্ষ পুরু উজ্জ্বল নক্ষত্রের স্ফীতি এবং ঘন নক্ষত্রদণ্ড অবস্থিত।',
+          stats: [
+            { label: 'ব্ল্যাক হোলের ভর', value: 'প্রায় ৪০ লক্ষ সূর্যের সমান' },
+            { label: 'ইভেন্ট হরাইজন ব্যাসার্ধ', value: 'প্রায় ১.২ কোটি কিমি' },
+            { label: 'কেন্দ্রীয় স্ফীতি', value: 'প্রায় ১০,০০০ আলোকবর্ষ' },
+            { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ২৬,০০০ আলোকবর্ষ' }
+          ],
+          sourceName: 'NASA JPL — Sagittarius A*',
+          sourceUrl: 'https://www.jpl.nasa.gov/edu/resources/teachable-moment/telescopes-get-extraordinary-view-of-milky-ways-black-hole/'
+        },
+        {
+          id: 'solar',
+          shortLabel: 'সৌরজগৎ',
+          pinLabel: '☀️ আমাদের সৌরজগৎ',
+          title: 'আমাদের সৌরজগৎ (Solar System)',
+          subtitle: 'কালপুরুষ শাখা (Orion Spur) • ৮টি গ্রহ ও পৃথিবী',
+          color: '#fde047',
+          position: [15.5, 0.25, 20.8],
+          camera: { theta: 0.85, phi: 1.02, radius: 34, target: [15.5, 0, 20.8] },
+          description:
+            'আমাদের সৌরজগৎ কালপুরুষ শাখার ভেতরের প্রান্তে, আকাশগঙ্গার কেন্দ্র থেকে প্রায় ২৬,০০০ আলোকবর্ষ দূরে অবস্থিত। সূর্যকে কেন্দ্র করে পৃথিবীসহ ৮টি গ্রহ প্রদক্ষিণ করছে। ভেতরে প্রবেশ করে একদম কাছ থেকে পরিষ্কার পৃথিবী, চাঁদ, মঙ্গল ও শনির বলয় দেখতে পারো।',
+          stats: [
+            { label: 'কেন্দ্র থেকে দূরত্ব', value: 'প্রায় ২৬,০০০ আলোকবর্ষ' },
+            { label: 'এক গ্যালাকটিক বছর', value: 'প্রায় ২৪–২৫ কোটি বছর' },
+            { label: 'অবস্থান', value: 'কালপুরুষ শাখা (Orion Spur)' },
+            { label: 'শাখার প্রস্থ', value: 'প্রায় ৩,৫০০ আলোকবর্ষ' }
+          ],
+          actionLabel: '🌍 সৌরজগৎ ও পৃথিবীতে জুম করুন',
+          actionType: 'enterSystem',
+          actionTarget: 'solar',
+          sourceName: 'NASA Imagine the Universe',
+          sourceUrl: 'https://imagine.gsfc.nasa.gov/science/featured_science/milkyway/'
+        },
+        {
+          id: 'proxima',
+          shortLabel: 'প্রক্সিমা সেন্টরি',
+          pinLabel: '🔴 প্রক্সিমা সেন্টরি মণ্ডল',
+          title: 'প্রক্সিমা সেন্টরি নক্ষত্রমণ্ডল',
+          subtitle: 'পৃথিবীর নিকটতম বহিঃসৌর গ্রহমণ্ডল • ৪.২৪ আলোকবর্ষ',
+          color: '#fb7185',
+          position: [18.8, -0.5, 18.2],
+          camera: { theta: 0.9, phi: 1.0, radius: 36, target: [18.8, -0.5, 18.2] },
+          description:
+            'সূর্যের সবচেয়ে কাছের নক্ষত্র প্রক্সিমা সেন্টরি একটি লাল বামন (M-type Red Dwarf) নক্ষত্র। এর বাসযোগ্য অঞ্চলে অবস্থিত পাথুরে এক্সোপ্ল্যানেট প্রক্সিমা সেন্টরি b পৃথিবীর নিকটতম পরিচিত বহিঃসৌর গ্রহ।',
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: '৪.২৪ আলোকবর্ষ' },
+            { label: 'নক্ষত্রের ধরন', value: 'লাল বামন (Red Dwarf)' },
+            { label: 'প্রক্সিমা b-এর ভর', value: 'পৃথিবীর ~১.০৬–১.২৭ গুণ' },
+            { label: 'কক্ষপথ কাল (b)', value: '১১.২ পৃথিবী দিন' }
+          ],
+          actionLabel: '🔴 প্রক্সিমা সেন্টরি মণ্ডলে প্রবেশ করুন',
+          actionType: 'enterSystem',
+          actionTarget: 'proxima',
+          sourceName: 'NASA Science — Proxima Centauri b',
+          sourceUrl: 'https://science.nasa.gov/exoplanet-catalog/proxima-centauri-b/'
+        },
+        {
+          id: 'trappist',
+          shortLabel: 'ট্র্যাপিস্ট-১',
+          pinLabel: '🪐 ট্র্যাপিস্ট-১ মণ্ডল (৭ গ্রহ)',
+          title: 'ট্র্যাপিস্ট-১ নক্ষত্রমণ্ডল (TRAPPIST-1)',
+          subtitle: '৭টি পৃথিবী-আকারের পাথুরে গ্রহের অনন্য সংসার • ৪০ আলোকবর্ষ',
+          color: '#c084fc',
+          position: [11.2, 0.8, 25.4],
+          camera: { theta: 0.72, phi: 0.95, radius: 38, target: [11.2, 0.8, 25.4] },
+          description:
+            'পৃথিবী থেকে প্রায় ৪০ আলোকবর্ষ দূরে কুম্ভ (Aquarius) নক্ষত্রমণ্ডলে অবস্থিত অতি-শীতল লাল বামন নক্ষত্র ট্র্যাপিস্ট-১। একে ঘিরে ৭টি পৃথিবী-আকারের পাথুরে গ্রহ (b থেকে h) খুব কাছাকাছি কক্ষপথে ঘুরছে, যার মধ্যে e, f এবং g বাসযোগ্য অঞ্চলে রয়েছে।',
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ৪০ আলোকবর্ষ' },
+            { label: 'মোট পাথুরে গ্রহ', value: '৭টি (b থেকে h)' },
+            { label: 'বাসযোগ্য অঞ্চলে', value: 'TRAPPIST-1e, f, g' },
+            { label: 'নক্ষত্রের ব্যাসার্ধ', value: 'সূর্যের প্রায় ১২%' }
+          ],
+          actionLabel: '🪐 ট্র্যাপিস্ট-১ ও ৭টি গ্রহ দেখুন',
+          actionType: 'enterSystem',
+          actionTarget: 'trappist',
+          sourceName: 'NASA Webb — TRAPPIST-1',
+          sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+        },
+        {
+          id: 'kepler186',
+          shortLabel: 'কেপলার-১৮৬',
+          pinLabel: '💠 কেপলার-১৮৬ মণ্ডল',
+          title: 'কেপলার-১৮৬ নক্ষত্রমণ্ডল (Kepler-186)',
+          subtitle: 'বাসযোগ্য অঞ্চলের প্রথম পৃথিবী-আকারের গ্রহ • ৫৮০ আলোকবর্ষ',
+          color: '#22d3ee',
+          position: [23.8, 0.5, 25.0],
+          camera: { theta: 0.75, phi: 0.95, radius: 42, target: [23.8, 0.5, 25.0] },
+          description:
+            'সিগনাস নক্ষত্রমণ্ডলে প্রায় ৫৮০ আলোকবর্ষ দূরে অবস্থিত লাল বামন নক্ষত্র কেপলার-১৮৬। এর ৫টি গ্রহের মধ্যে সবচেয়ে বাইরের গ্রহ Kepler-186f হলো অন্য নক্ষত্রের বাসযোগ্য অঞ্চলে আবিষ্কৃত প্রথম পৃথিবী-আকারের গ্রহ।',
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ৫৮০ আলোকবর্ষ' },
+            { label: 'মোট গ্রহ', value: '৫টি (b, c, d, e, f)' },
+            { label: 'Kepler-186f ব্যাসার্ধ', value: 'পৃথিবীর ~১.১৭ গুণ' },
+            { label: 'কক্ষপথ কাল (f)', value: 'প্রায় ১৩০ দিন' }
+          ],
+          actionLabel: '💠 কেপলার-১৮৬ ও Kepler-186f দেখুন',
+          actionType: 'enterSystem',
+          actionTarget: 'kepler186',
+          sourceName: 'NASA — Kepler-186f',
+          sourceUrl: 'https://www.nasa.gov/news-release/nasas-kepler-telescope-discovers-first-earth-size-planet-in-habitable-zone/'
+        },
+        {
+          id: 'perseus',
+          shortLabel: 'পার্সিয়াস বাহু',
+          pinLabel: 'পার্সিয়াস প্রধান বাহু',
+          title: 'পার্সিয়াস বাহু (Perseus Arm)',
+          subtitle: 'আকাশগঙ্গার অন্যতম প্রধান সর্পিল বাহু',
+          color: '#60a5fa',
+          position: [28, 0.4, 31],
+          camera: { theta: 0.72, phi: 0.65, radius: 68, target: [16, 0, 18] },
+          description:
+            'নাসার স্পিটজার টেলিস্কোপের পর্যবেক্ষণ অনুযায়ী আকাশগঙ্গার দুটি প্রধান বাহুর একটি হলো পার্সিয়াস বাহু। কেন্দ্রীয় নক্ষত্রদণ্ডের এক প্রান্ত থেকে বের হয়ে এটি বাইরের দিকে ঘুরে গেছে।',
+          stats: [
+            { label: 'শ্রেণি', value: 'প্রধান সর্পিল বাহু' },
+            { label: 'বৈশিষ্ট্য', value: 'উচ্চ নক্ষত্র ঘনত্ব' },
+            { label: 'অবস্থান', value: 'সৌরজগতের বাইরের দিকে' },
+            { label: 'উৎপত্তি', value: 'কেন্দ্রীয় বারের প্রান্ত' }
+          ],
+          sourceName: 'NASA Science — Milky Way Arms',
+          sourceUrl: 'https://science.nasa.gov/resource/the-milky-way-galaxy/'
+        },
+        {
+          id: 'scutum',
+          shortLabel: 'স্কুটাম–সেন্টরাস',
+          pinLabel: 'স্কুটাম–সেন্টরাস বাহু',
+          title: 'স্কুটাম–সেন্টরাস বাহু (Scutum–Centaurus Arm)',
+          subtitle: 'আকাশগঙ্গার দ্বিতীয় প্রধান সর্পিল বাহু',
+          color: '#38bdf8',
+          position: [-26, 0.4, -22],
+          camera: { theta: 3.7, phi: 0.68, radius: 68, target: [-15, 0, -14] },
+          description:
+            'পার্সিয়াস বাহুর বিপরীত প্রান্তে কেন্দ্রীয় নক্ষত্রদণ্ড থেকে বের হয়েছে স্কুটাম–সেন্টরাস প্রধান বাহু। এই বাহুতে প্রচুর নবীন নীল নক্ষত্র এবং সক্রিয় নক্ষত্র-সৃষ্টি অঞ্চল রয়েছে।',
+          stats: [
+            { label: 'শ্রেণি', value: 'প্রধান সর্পিল বাহু' },
+            { label: 'প্রতিসাম্য', value: 'পার্সিয়াস বাহুর বিপরীত' },
+            { label: 'নক্ষত্র গঠন', value: 'অত্যন্ত সক্রিয় অঞ্চল' },
+            { label: 'উৎপত্তি', value: 'কেন্দ্রীয় বারের বিপরীত প্রান্ত' }
+          ],
+          sourceName: 'NASA Science — Milky Way Arms',
+          sourceUrl: 'https://science.nasa.gov/resource/the-milky-way-galaxy/'
+        },
+        {
+          id: 'sagittarius',
+          shortLabel: 'গৌণ বাহুসমূহ',
+          pinLabel: 'স্যাজিটেরিয়াস ও নরমা বাহু',
+          title: 'স্যাজিটেরিয়াস ও নরমা গৌণ বাহু',
+          subtitle: 'গ্যাস ও নক্ষত্র-সৃষ্টি সমৃদ্ধ গৌণ সর্পিল বাহু',
+          color: '#f472b6',
+          position: [18, 0.3, -24],
+          camera: { theta: -0.7, phi: 0.65, radius: 74, target: [10, 0, -12] },
+          description:
+            'দুটি প্রধান বাহুর মাঝখানে অবস্থিত স্যাজিটেরিয়াস–ক্যারিনা এবং নরমা–আউটার গৌণ বাহু দুটি মূলত মহাজাগতিক গ্যাস, ধূলিকণা এবং উজ্জ্বল নীহারিকার ভাণ্ডার, যেখানে নিয়মিত নতুন নক্ষত্রের জন্ম হয়।',
+          stats: [
+            { label: 'শ্রেণি', value: 'গৌণ সর্পিল বাহু' },
+            { label: 'প্রধান উপাদান', value: 'গ্যাস ও ধূলিকণা' },
+            { label: 'স্যাজিটেরিয়াস বাহু', value: 'সৌরজগতের ভেতরের দিকে' },
+            { label: 'নরমা বাহু', value: 'বাইরের প্রান্তে' }
+          ],
+          sourceName: 'NASA Science — Milky Way Arms',
+          sourceUrl: 'https://science.nasa.gov/resource/the-milky-way-galaxy/'
+        },
+        {
+          id: 'neighbors',
+          shortLabel: 'প্রতিবেশী ছায়াপথ',
+          pinLabel: 'ম্যাগেলানিক মেঘ ও অ্যান্ড্রোমিডা',
+          title: 'প্রতিবেশী ছায়াপথ: LMC ও অ্যান্ড্রোমিডা (M31)',
+          subtitle: 'লোকাল গ্রুপের নিকটবর্তী সঙ্গী (প্রতীকী দূরত্ব স্কেলে)',
+          color: '#c084fc',
+          position: [-68, -24, 52],
+          camera: { theta: 2.35, phi: 1.08, radius: 162, target: [-15, -4, 12] },
+          description:
+            'আকাশগঙ্গার উপগ্রহ ছায়াপথ বৃহৎ ম্যাগেলানিক মেঘ (LMC) প্রায় ১,৬৩,০০০ আলোকবর্ষ দূরে এবং নিকটতম বৃহৎ প্রতিবেশী অ্যান্ড্রোমিডা (M31) প্রায় ২৫ লক্ষ আলোকবর্ষ দূরে অবস্থিত।',
+          stats: [
+            { label: 'বৃহৎ ম্যাগেলানিক মেঘ', value: 'প্রায় ১,৬৩,০০০ আলোকবর্ষ' },
+            { label: 'অ্যান্ড্রোমিডা দূরত্ব', value: 'প্রায় ২৫ লক্ষ আলোকবর্ষ' },
+            { label: 'অ্যান্ড্রোমিডা ব্যাস', value: 'প্রায় ১,৫২,০০০ আলোকবর্ষ' },
+            { label: 'লোকাল গ্রুপ', value: '৫০+ ছায়াপথের সমষ্টি' }
+          ],
+          sourceName: 'NASA Science — Messier 31',
+          sourceUrl: 'https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-31/'
+        },
+        {
+          id: 'halo',
+          shortLabel: 'ডার্ক ম্যাটার হ্যালো',
+          pinLabel: 'ডার্ক ম্যাটার হ্যালো',
+          title: 'ডার্ক ম্যাটার হ্যালো ও প্রতিবেশী ছায়াপথ',
+          subtitle: 'অদৃশ্য মহাকর্ষীয় বলয়, LMC ও অ্যান্ড্রোমিডা (M31)',
+          color: '#a78bfa',
+          position: [-38, 22, 18],
+          camera: { theta: 0.9, phi: 1.05, radius: 158, target: [0, 2, 0] },
+          description:
+            'দৃশ্যমান নক্ষত্র ডিস্কের চারপাশে বিশাল অদৃশ্য ডার্ক ম্যাটার হ্যালো আকাশগঙ্গার মোট ভরের ৯০%-এরও বেশি ধারণ করে। এর বাইরে রয়েছে উপগ্রহ ছায়াপথ বৃহৎ ম্যাগেলানিক মেঘ (~১,৬৩,০০০ আলোকবর্ষ) এবং বৃহৎ প্রতিবেশী অ্যান্ড্রোমিডা (~২৫ লক্ষ আলোকবর্ষ)।',
+          stats: [
+            { label: 'ডার্ক ম্যাটার ভর', value: 'মোট ভরের ৯০%-এর বেশি' },
+            { label: 'সম্ভাব্য বিস্তৃতি', value: 'প্রায় ২০ লক্ষ আলোকবর্ষ' },
+            { label: 'বৃহৎ ম্যাগেলানিক মেঘ', value: 'প্রায় ১,৬৩,০০০ আলোকবর্ষ' },
+            { label: 'অ্যান্ড্রোমিডা (M31)', value: 'প্রায় ২৫ লক্ষ আলোকবর্ষ' }
+          ],
+          sourceName: 'Milky Way — Wikipedia',
+          sourceUrl: 'https://en.wikipedia.org/wiki/Milky_Way'
+        }
+      ];
+
+      // =========================================================================
+      // 2. MULTI-STAR-SYSTEM & PLANET CATALOG (RAZOR-SHARP 3D WORLDS)
+      // =========================================================================
+      const STAR_SYSTEMS = {
+        solar: {
+          id: 'solar',
+          name: 'আমাদের সৌরজগৎ',
+          subtitle: 'কালপুরুষ শাখা • G-টাইপ হলুদ নক্ষত্র সূর্য ও ৮টি গ্রহ',
+          description:
+            'আমাদের সূর্যকে কেন্দ্র করে ঘুরছে ৮টি গ্রহ। যেকোনো গ্রহে (বিশেষত পৃথিবী, মঙ্গল, বৃহস্পতি বা শনি) ক্লিক করলে ক্যামেরা সরাসরি সেই গ্রহের কক্ষপথে গিয়ে একদম পরিষ্কার ক্লোজ-আপ দেখাবে।',
+          star: {
+            name: 'সূর্য (Sun)',
+            radius: 4.8,
+            color: '#ffdf73',
+            glowColor: '#ffaa33',
+            textureType: 'sun_yellow'
+          },
+          habitableZone: { inner: 16.5, outer: 21.8 },
+          defaultCamera: { theta: 0.7, phi: 1.05, radius: 56 },
+          stats: [
+            { label: 'কেন্দ্রীয় নক্ষত্র', value: 'সূর্য (G-টাইপ নক্ষত্র)' },
+            { label: 'মোট গ্রহ', value: '৮টি (৪ পাথুরে, ৪ দৈত্য)' },
+            { label: 'গ্যালাকটিক অবস্থান', value: 'কালপুরুষ শাখা (২৬,০০০ আলোকবর্ষ)' },
+            { label: 'বাসযোগ্য গ্রহ', value: 'পৃথিবী (৩য় গ্রহ)' }
+          ],
+          sourceName: 'NASA Solar System Facts',
+          sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/',
+          planets: [
+            {
+              id: 'mercury',
+              name: 'বুধ (Mercury)',
+              shortName: 'বুধ',
+              orbitRadius: 9.2,
+              radius: 0.72,
+              speed: 0.58,
+              tilt: 0.03,
+              rotSpeed: 0.12,
+              textureType: 'mercury',
+              color: '#a8a29e',
+              subtitle: 'সূর্যের সবচেয়ে কাছের পাথুরে গ্রহ',
+              description: 'বুধ সৌরজগতের ক্ষুদ্রতম ও সূর্যের নিকটতম গ্রহ। এর পৃষ্ঠ অসংখ্য উল্কাপাতের গর্তে (Crater) ভরা এবং বায়ুমণ্ডল প্রায় নেই বললেই চলে।',
+              stats: [
+                { label: 'ধরন', value: 'পাথুরে গ্রহ' },
+                { label: 'সূর্য থেকে ক্রম', value: '১ম গ্রহ' },
+                { label: 'আবহাওয়া', value: 'অত্যন্ত উত্তপ্ত ও শীতল' },
+                { label: 'উপগ্রহ', value: '০টি' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'venus',
+              name: 'শুক্র (Venus)',
+              shortName: 'শুক্র',
+              orbitRadius: 13.4,
+              radius: 1.18,
+              speed: 0.42,
+              tilt: 3.09,
+              rotSpeed: -0.06,
+              textureType: 'venus',
+              color: '#f5d08a',
+              atmosphereColor: '#fde68a',
+              subtitle: 'ঘন মেঘে ঢাকা সৌরজগতের উষ্ণতম গ্রহ',
+              description: 'শুক্র গ্রহের ঘন কার্বন ডাই-অক্সাইড বায়ুমণ্ডল ও সালফিউরিক অ্যাসিডের মেঘ একে সৌরজগতের সবচেয়ে উত্তপ্ত গ্রহে পরিণত করেছে।',
+              stats: [
+                { label: 'ধরন', value: 'পাথুরে গ্রহ' },
+                { label: 'সূর্য থেকে ক্রম', value: '২য় গ্রহ' },
+                { label: 'বৈশিষ্ট্য', value: 'বিপরীতমুখী ঘূর্ণন' },
+                { label: 'উপগ্রহ', value: '০টি' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'earth',
+              name: 'পৃথিবী (Earth)',
+              shortName: '🌍 পৃথিবী',
+              orbitRadius: 18.6,
+              radius: 1.38,
+              speed: 0.31,
+              tilt: 0.41,
+              rotSpeed: 0.45,
+              textureType: 'earth',
+              hasClouds: true,
+              hasMoon: true,
+              color: '#38bdf8',
+              atmosphereColor: '#60a5fa',
+              subtitle: 'আমাদের নীলাভ গ্রহ • মহাসাগর, মহাদেশ ও চাঁদ',
+              description:
+                'সূর্যের বাসযোগ্য অঞ্চলে অবস্থিত আমাদের পৃথিবী—মহাবিশ্বে প্রাণের একমাত্র পরিচিত আবাসস্থল। এর পৃষ্ঠের প্রায় ৭০% তরল মহাসাগর, ঘূর্ণায়মান সাদা মেঘমালা, প্রতিরক্ষামূলক নীল বায়ুমণ্ডল এবং একমাত্র প্রাকৃতিক উপগ্রহ চাঁদ একে ঘিরে প্রদক্ষিণ করছে।',
+              stats: [
+                { label: 'অবস্থান', value: 'বাসযোগ্য অঞ্চল (৩য় গ্রহ)' },
+                { label: 'প্রাকৃতিক উপগ্রহ', value: '১টি (চাঁদ)' },
+                { label: 'গ্যালাকটিক দূরত্ব', value: 'কেন্দ্র থেকে ২৬,০০০ আলোকবর্ষ' },
+                { label: 'বিশেষত্ব', value: 'তরল পানি ও প্রাণসমৃদ্ধ বায়ুমণ্ডল' }
+              ],
+              sourceName: 'NASA Solar System Facts',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'mars',
+              name: 'মঙ্গল (Mars)',
+              shortName: 'মঙ্গল',
+              orbitRadius: 23.6,
+              radius: 0.96,
+              speed: 0.24,
+              tilt: 0.44,
+              rotSpeed: 0.42,
+              textureType: 'mars',
+              color: '#ea580c',
+              atmosphereColor: '#fb923c',
+              subtitle: 'লাল গ্রহ • আয়রন অক্সাইড ধূলিকণা ও মেরু বরফ',
+              description: 'মঙ্গল গ্রহের মাটিতে প্রচুর আয়রন অক্সাইড থাকায় একে লালচে দেখায়। এখানে সৌরজগতের বৃহত্তম আগ্নেয়গিরি অলিম্পাস মনস এবং বিশাল গিরিখাত ভ্যালেস মেরিনারিস অবস্থিত।',
+              stats: [
+                { label: 'ধরন', value: 'পাথুরে লাল গ্রহ' },
+                { label: 'সূর্য থেকে ক্রম', value: '৪র্থ গ্রহ' },
+                { label: 'মেরু অঞ্চল', value: 'জমাট বরফের স্তর' },
+                { label: 'উপগ্রহ', value: '২টি (ফোবোস ও ডিমোস)' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'jupiter',
+              name: 'বৃহস্পতি (Jupiter)',
+              shortName: 'বৃহস্পতি',
+              orbitRadius: 31.8,
+              radius: 2.85,
+              speed: 0.14,
+              tilt: 0.05,
+              rotSpeed: 0.85,
+              textureType: 'jupiter',
+              color: '#e6b88a',
+              subtitle: 'সৌরজগতের বৃহত্তম গ্যাস দানব ও মহা লাল দাগ',
+              description: 'বৃহস্পতি সৌরজগতের সবচেয়ে বড় গ্রহ। এর রঙিন মেঘের স্তর ও শতাব্দীপ্রাচীন বিশাল ঘূর্ণিঝড় ‘গ্রেট রেড স্পট’ পৃথিবীর চেয়েও বড়।',
+              stats: [
+                { label: 'ধরন', value: 'গ্যাস দানব (Gas Giant)' },
+                { label: 'সূর্য থেকে ক্রম', value: '৫ম গ্রহ' },
+                { label: 'বিশেষত্ব', value: 'গ্রেট রেড স্পট ঘূর্ণিঝড়' },
+                { label: 'আবর্তন', value: 'সৌরজগতে দ্রুততম' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'saturn',
+              name: 'শনি (Saturn)',
+              shortName: '🪐 শনি',
+              orbitRadius: 42.0,
+              radius: 2.35,
+              speed: 0.1,
+              tilt: 0.47,
+              rotSpeed: 0.75,
+              textureType: 'saturn',
+              hasRings: true,
+              ringColors: ['#e7d3a7', '#c5a876', '#8c7350'],
+              color: '#ebd59b',
+              subtitle: 'বরফ ও পাথরের অপূর্ব বলয়যুক্ত গ্যাস দানব',
+              description: 'শনি গ্রহ তার বিশাল ও উজ্জ্বল বলয়ের জন্য বিখ্যাত, যা অসংখ্য বরফকণা ও পাথরের টুকরো দিয়ে তৈরি।',
+              stats: [
+                { label: 'ধরন', value: 'বলয়যুক্ত গ্যাস দানব' },
+                { label: 'সূর্য থেকে ক্রম', value: '৬ষ্ঠ গ্রহ' },
+                { label: 'বলয়ের উপাদান', value: 'বরফ ও শিলাকণা' },
+                { label: 'অক্ষীয় ঝোঁক', value: 'প্রায় ২৬.৭°' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'uranus',
+              name: 'ইউরেনাস (Uranus)',
+              shortName: 'ইউরেনাস',
+              orbitRadius: 51.0,
+              radius: 1.65,
+              speed: 0.072,
+              tilt: 1.7,
+              rotSpeed: -0.52,
+              textureType: 'uranus',
+              hasThinRing: true,
+              color: '#67e8f9',
+              atmosphereColor: '#a5f3fc',
+              subtitle: 'পাশ ফিরে ঘোরা নীলাভ-সবুজ বরফ দানব',
+              description: 'ইউরেনাস একটি বরফ দানব গ্রহ, যার বায়ুমণ্ডলে মিথেন গ্যাস থাকায় এর রঙ হালকা সায়ান-নীল। এটি প্রায় ৯৮° কাত হয়ে কক্ষপথে ঘোরে।',
+              stats: [
+                { label: 'ধরন', value: 'বরফ দানব (Ice Giant)' },
+                { label: 'সূর্য থেকে ক্রম', value: '৭ম গ্রহ' },
+                { label: 'রঙের কারণ', value: 'মিথেন গ্যাস' },
+                { label: 'বলয়', value: 'সূক্ষ্ম অন্ধকার বলয়' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            },
+            {
+              id: 'neptune',
+              name: 'নেপচুন (Neptune)',
+              shortName: 'নেপচুন',
+              orbitRadius: 59.0,
+              radius: 1.6,
+              speed: 0.055,
+              tilt: 0.49,
+              rotSpeed: 0.56,
+              textureType: 'neptune',
+              color: '#3b82f6',
+              atmosphereColor: '#60a5fa',
+              subtitle: 'সৌরজগতের দূরতম গাঢ় নীল ঝড়ো গ্রহ',
+              description: 'নেপচুন সৌরজগতের সবচেয়ে বাইরের প্রধান গ্রহ। এখানে সুপারসনিক গতির তীব্র বাতাস ও গাঢ় নীল মেঘের ঝড় বয়ে চলে।',
+              stats: [
+                { label: 'ধরন', value: 'বরফ দানব (Ice Giant)' },
+                { label: 'সূর্য থেকে ক্রম', value: '৮ম গ্রহ' },
+                { label: 'বৈশিষ্ট্য', value: 'তীব্র সুপারসনিক ঝড়' },
+                { label: 'রঙ', value: 'গাঢ় কোবাল্ট নীল' }
+              ],
+              sourceName: 'NASA Solar System',
+              sourceUrl: 'https://science.nasa.gov/solar-system/solar-system-facts/'
+            }
+          ]
+        },
+
+        proxima: {
+          id: 'proxima',
+          name: 'প্রক্সিমা সেন্টরি মণ্ডল',
+          subtitle: '৪.২৪ আলোকবর্ষ দূরে • লাল বামন নক্ষত্র ও নিকটতম এক্সোপ্ল্যানেট',
+          description:
+            'পৃথিবীর সবচেয়ে কাছের নক্ষত্র প্রক্সিমা সেন্টরি একটি শীতল লাল বামন নক্ষত্র। এর খুব কাছ দিয়ে ঘুরছে পাথুরে এক্সোপ্ল্যানেট Proxima d এবং বাসযোগ্য অঞ্চলে অবস্থিত সুপার-আর্থ Proxima b।',
+          star: {
+            name: 'প্রক্সিমা সেন্টরি (Red Dwarf)',
+            radius: 3.6,
+            color: '#ff5e4d',
+            glowColor: '#ff3b30',
+            textureType: 'sun_red'
+          },
+          habitableZone: { inner: 16.5, outer: 22.0 },
+          defaultCamera: { theta: 0.65, phi: 1.0, radius: 40 },
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: '৪.২৪ আলোকবর্ষ' },
+            { label: 'নক্ষত্রের তাপমাত্রা', value: 'প্রায় ৩,০৪২ কেলভিন' },
+            { label: 'নক্ষত্রের শ্রেণি', value: 'M-টাইপ লাল বামন' },
+            { label: 'পরিচিত গ্রহ', value: 'Proxima d ও Proxima b' }
+          ],
+          sourceName: 'NASA — Proxima Centauri b',
+          sourceUrl: 'https://science.nasa.gov/exoplanet-catalog/proxima-centauri-b/',
+          planets: [
+            {
+              id: 'proxima_d',
+              name: 'প্রক্সিমা সেন্টরি d',
+              shortName: 'Proxima d',
+              orbitRadius: 11.2,
+              radius: 0.85,
+              speed: 0.68,
+              tilt: 0.08,
+              rotSpeed: 0.25,
+              textureType: 'mercury',
+              color: '#d97757',
+              subtitle: 'অতি-হালকা পাথুরে বহিঃসৌর গ্রহ',
+              description: 'প্রক্সিমা সেন্টরি d হলো প্রক্সিমা সেন্টরিকে অত্যন্ত কাছ থেকে প্রদক্ষিণকারী একটি ছোট পাথুরে এক্সোপ্ল্যানেট, যার ভর পৃথিবীর প্রায় ০.২৬ গুণ।',
+              stats: [
+                { label: 'ভর', value: 'পৃথিবীর ~০.২৬ গুণ' },
+                { label: 'কক্ষপথ কাল', value: '৫.১ পৃথিবী দিন' },
+                { label: 'ধরন', value: 'পাথুরে এক্সোপ্ল্যানেট' },
+                { label: 'পৃথিবী থেকে দূরত্ব', value: '৪.২৪ আলোকবর্ষ' }
+              ],
+              sourceName: 'NASA — Proxima Centauri d',
+              sourceUrl: 'https://science.nasa.gov/exoplanet-catalog/proxima-centauri-d/'
+            },
+            {
+              id: 'proxima_b',
+              name: 'প্রক্সিমা সেন্টরি b',
+              shortName: '🔴 Proxima b',
+              orbitRadius: 19.2,
+              radius: 1.52,
+              speed: 0.36,
+              tilt: 0.12,
+              rotSpeed: 0.32,
+              textureType: 'proxima_b',
+              hasClouds: true,
+              color: '#fb7185',
+              atmosphereColor: '#fda4af',
+              subtitle: 'পৃথিবীর নিকটতম বাসযোগ্য অঞ্চলের সুপার-আর্থ (শিল্পী কল্পনা)',
+              description:
+                'প্রক্সিমা সেন্টরি b আমাদের সবচেয়ে কাছের পরিচিত বহিঃসৌর গ্রহ। এটি নক্ষত্রের বাসযোগ্য অঞ্চলে মাত্র ১১.২ দিনে একবার প্রদক্ষিণ করে। তবে লাল বামন নক্ষত্রের তীব্র অতিবেগুনি বিকিরণের কারণে এর বায়ুমণ্ডল টিকে আছে কিনা তা নিয়ে গবেষণা চলছে।',
+              stats: [
+                { label: 'ভর', value: 'পৃথিবীর ~১.০৬–১.২৭ গুণ' },
+                { label: 'কক্ষপথ কাল', value: '১১.২ পৃথিবী দিন' },
+                { label: 'নক্ষত্র থেকে দূরত্ব', value: '০.০৪৮৫ AU' },
+                { label: 'অবস্থান', value: 'বাসযোগ্য অঞ্চলে' }
+              ],
+              sourceName: 'NASA — Proxima b 3D Model',
+              sourceUrl: 'https://science.nasa.gov/resource/proxima-b-3d-model/'
+            }
+          ]
+        },
+
+        trappist: {
+          id: 'trappist',
+          name: 'ট্র্যাপিস্ট-১ নক্ষত্রমণ্ডল',
+          subtitle: '৪০ আলোকবর্ষ দূরে • ৭টি পৃথিবী-আকারের পাথুরে গ্রহের সংসার',
+          description:
+            'অতি-শীতল লাল বামন নক্ষত্র ট্র্যাপিস্ট-১-কে ঘিরে ৭টি পৃথিবী-সদৃশ পাথুরে গ্রহ (b থেকে h) অত্যন্ত ঘনভাবে ঘুরছে। এর মধ্যে TRAPPIST-1e, f এবং g বাসযোগ্য অঞ্চলে অবস্থিত।',
+          star: {
+            name: 'ট্র্যাপিস্ট-১ (Ultra-Cool Dwarf)',
+            radius: 3.1,
+            color: '#ff4d6d',
+            glowColor: '#e11d48',
+            textureType: 'sun_red'
+          },
+          habitableZone: { inner: 18.8, outer: 30.5 },
+          defaultCamera: { theta: 0.68, phi: 0.96, radius: 48 },
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ৪০ আলোকবর্ষ' },
+            { label: 'মোট পাথুরে গ্রহ', value: '৭টি (b থেকে h)' },
+            { label: 'কক্ষপথ কাল', value: '১.৫ থেকে ~১৯ দিন' },
+            { label: 'বাসযোগ্য অঞ্চল', value: 'e, f ও g গ্রহ' }
+          ],
+          sourceName: 'NASA Webb — TRAPPIST-1',
+          sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/',
+          planets: [
+            {
+              id: 't1_b', name: 'TRAPPIST-1b', shortName: '1b', orbitRadius: 8.6, radius: 1.05, speed: 0.85, tilt: 0.04, rotSpeed: 0.3,
+              textureType: 'mars', color: '#f97316', subtitle: 'উত্তপ্ত অভ্যন্তরীণ পাথুরে গ্রহ',
+              description: 'নক্ষত্রের সবচেয়ে কাছের পাথুরে গ্রহ; মাত্র ১.৫ দিনে কক্ষপথ সম্পন্ন করে।',
+              stats: [{ label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'কক্ষপথ কাল', value: 'প্রায় ১.৫ দিন' }, { label: 'অবস্থান', value: '১ম গ্রহ' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA TRAPPIST-1', sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+            },
+            {
+              id: 't1_c', name: 'TRAPPIST-1c', shortName: '1c', orbitRadius: 12.2, radius: 1.08, speed: 0.68, tilt: 0.05, rotSpeed: 0.28,
+              textureType: 'venus', color: '#fbbf24', subtitle: 'ঘন শিলাময় অভ্যন্তরীণ গ্রহ',
+              description: 'পৃথিবীর প্রায় সমান আকারের ঘন পাথুরে গ্রহ, নক্ষত্রের উষ্ণ অভ্যন্তরীণ অংশে অবস্থিত।',
+              stats: [{ label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'অবস্থান', value: '২য় গ্রহ' }, { label: 'নক্ষত্র', value: 'TRAPPIST-1' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA TRAPPIST-1', sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+            },
+            {
+              id: 't1_d', name: 'TRAPPIST-1d', shortName: '1d', orbitRadius: 16.0, radius: 0.92, speed: 0.54, tilt: 0.06, rotSpeed: 0.25,
+              textureType: 'proxima_b', color: '#fb923c', subtitle: 'বাসযোগ্য অঞ্চলের প্রান্তে থাকা হালকা পাথুরে গ্রহ',
+              description: 'এর ভর পৃথিবীর প্রায় ০.৩৯ গুণ এবং এটি মাত্র ৪ দিনে নক্ষত্রকে প্রদক্ষিণ করে।',
+              stats: [{ label: 'ভর', value: 'পৃথিবীর ~০.৩৯ গুণ' }, { label: 'কক্ষপথ কাল', value: '৪.০ দিন' }, { label: 'অবস্থান', value: '৩য় গ্রহ' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA — TRAPPIST-1d', sourceUrl: 'https://science.nasa.gov/exoplanet-catalog/trappist-1-d/'
+            },
+            {
+              id: 't1_e', name: 'TRAPPIST-1e', shortName: '💧 1e (বাসযোগ্য)', orbitRadius: 20.6, radius: 1.24, speed: 0.42, tilt: 0.08, rotSpeed: 0.34,
+              textureType: 'trappist_e', hasClouds: true, color: '#38bdf8', atmosphereColor: '#38bdf8',
+              subtitle: 'বাসযোগ্য অঞ্চলের সবচেয়ে সম্ভাবনাময় পাথুরে গ্রহ (শিল্পী কল্পনা)',
+              description: 'TRAPPIST-1e-কে সবচেয়ে পৃথিবী-সদৃশ সম্ভাবনাময় এক্সোপ্ল্যানেটগুলোর একটি মনে করা হয়। এর ভর পৃথিবীর প্রায় ০.৬৯ গুণ এবং কক্ষপথ কাল ৬.১ দিন। জেমস ওয়েব টেলিস্কোপ এর বায়ুমণ্ডল পর্যবেক্ষণ করছে।',
+              stats: [{ label: 'ভর', value: 'পৃথিবীর ~০.৬৯ গুণ' }, { label: 'কক্ষপথ কাল', value: '৬.১ পৃথিবী দিন' }, { label: 'অবস্থান', value: 'বাসযোগ্য অঞ্চল (৪র্থ গ্রহ)' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA — TRAPPIST-1e', sourceUrl: 'https://science.nasa.gov/exoplanet-catalog/trappist-1-e/'
+            },
+            {
+              id: 't1_f', name: 'TRAPPIST-1f', shortName: '1f', orbitRadius: 25.0, radius: 1.18, speed: 0.32, tilt: 0.06, rotSpeed: 0.3,
+              textureType: 'uranus', color: '#67e8f9', atmosphereColor: '#a5f3fc', subtitle: 'বাসযোগ্য অঞ্চলের শীতল মহাসাগরীয় প্রার্থী',
+              description: 'বাসযোগ্য অঞ্চলে অবস্থিত শীতল পাথুরে গ্রহ; এতে বরফ বা তরল পানির স্তর থাকার সম্ভাবনা নিয়ে গবেষণা চলছে।',
+              stats: [{ label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'অবস্থান', value: 'বাসযোগ্য অঞ্চল (৫ম গ্রহ)' }, { label: 'আকার', value: 'প্রায় পৃথিবীর সমান' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA TRAPPIST-1', sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+            },
+            {
+              id: 't1_g', name: 'TRAPPIST-1g', shortName: '1g', orbitRadius: 29.4, radius: 1.32, speed: 0.25, tilt: 0.07, rotSpeed: 0.28,
+              textureType: 'neptune', color: '#818cf8', atmosphereColor: '#a5b4fc', subtitle: 'ট্র্যাপিস্ট-১ মণ্ডলের বৃহত্তম গ্রহ',
+              description: 'সাতটি গ্রহের মধ্যে সবচেয়ে বড় এবং বাসযোগ্য অঞ্চলের বাইরের প্রান্তে অবস্থিত।',
+              stats: [{ label: 'ধরন', value: 'বৃহত্তম পাথুরে গ্রহ' }, { label: 'অবস্থান', value: 'বাসযোগ্য অঞ্চল (৬ষ্ঠ গ্রহ)' }, { label: 'নক্ষত্র', value: 'TRAPPIST-1' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA TRAPPIST-1', sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+            },
+            {
+              id: 't1_h', name: 'TRAPPIST-1h', shortName: '1h', orbitRadius: 34.4, radius: 0.88, speed: 0.18, tilt: 0.05, rotSpeed: 0.22,
+              textureType: 'mercury', color: '#94a3b8', subtitle: 'দূরতম শীতল বরফাবৃত পাথুরে গ্রহ',
+              description: 'ট্র্যাপিস্ট-১ মণ্ডলের সবচেয়ে বাইরের ও শীতলতম গ্রহ, প্রায় ১৯ দিনে কক্ষপথ সম্পন্ন করে।',
+              stats: [{ label: 'ধরন', value: 'শীতল পাথুরে গ্রহ' }, { label: 'কক্ষপথ কাল', value: 'প্রায় ১৯ দিন' }, { label: 'অবস্থান', value: '৭ম গ্রহ' }, { label: 'দূরত্ব', value: '৪০ আলোকবর্ষ' }],
+              sourceName: 'NASA TRAPPIST-1', sourceUrl: 'https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-is-webb-revealing-about-the-trappist-1-system/'
+            }
+          ]
+        },
+
+        kepler186: {
+          id: 'kepler186',
+          name: 'কেপলার-১৮৬ নক্ষত্রমণ্ডল',
+          subtitle: '৫৮০ আলোকবর্ষ দূরে • সিগনাস নক্ষত্রমণ্ডলের ৫ গ্রহের সংসার',
+          description:
+            'নাসার কেপলার স্পেস টেলিস্কোপ এই লাল বামন নক্ষত্রের চারপাশে ৫টি গ্রহ আবিষ্কার করে। এর সবচেয়ে বাইরের গ্রহ Kepler-186f হলো অন্য নক্ষত্রের বাসযোগ্য অঞ্চলে আবিষ্কৃত প্রথম পৃথিবী-আকারের গ্রহ।',
+          star: {
+            name: 'কেপলার-১৮৬ (Red Dwarf)',
+            radius: 3.9,
+            color: '#ff7043',
+            glowColor: '#ff5722',
+            textureType: 'sun_red'
+          },
+          habitableZone: { inner: 25.0, outer: 32.0 },
+          defaultCamera: { theta: 0.6, phi: 0.98, radius: 46 },
+          stats: [
+            { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ৫৮০ আলোকবর্ষ' },
+            { label: 'নক্ষত্রমণ্ডল', value: 'সিগনাস (Cygnus)' },
+            { label: 'মোট গ্রহ', value: '৫টি (b, c, d, e, f)' },
+            { label: 'ঐতিহাসিক গ্রহ', value: 'Kepler-186f' }
+          ],
+          sourceName: 'NASA — Kepler-186f',
+          sourceUrl: 'https://www.nasa.gov/news-release/nasas-kepler-telescope-discovers-first-earth-size-planet-in-habitable-zone/',
+          planets: [
+            {
+              id: 'k_b', name: 'Kepler-186b', shortName: '186b', orbitRadius: 9.5, radius: 0.95, speed: 0.72, tilt: 0.04, rotSpeed: 0.3,
+              textureType: 'mars', color: '#f97316', subtitle: 'অত্যন্ত উত্তপ্ত ১ম পাথুরে গ্রহ',
+              description: 'নক্ষত্রের সবচেয়ে কাছের পাথুরে গ্রহ।',
+              stats: [{ label: 'অবস্থান', value: '১ম গ্রহ' }, { label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'নক্ষত্র', value: 'Kepler-186' }, { label: 'দূরত্ব', value: '৫৮০ আলোকবর্ষ' }],
+              sourceName: 'NASA Kepler-186', sourceUrl: 'https://www.nasa.gov/image-article/kepler-186-solar-system/'
+            },
+            {
+              id: 'k_c', name: 'Kepler-186c', shortName: '186c', orbitRadius: 13.5, radius: 1.05, speed: 0.56, tilt: 0.05, rotSpeed: 0.28,
+              textureType: 'venus', color: '#f59e0b', subtitle: '২য় অভ্যন্তরীণ পাথুরে গ্রহ',
+              description: 'কেপলার-১৮৬ মণ্ডলের দ্বিতীয় গ্রহ।',
+              stats: [{ label: 'অবস্থান', value: '২য় গ্রহ' }, { label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'নক্ষত্র', value: 'Kepler-186' }, { label: 'দূরত্ব', value: '৫৮০ আলোকবর্ষ' }],
+              sourceName: 'NASA Kepler-186', sourceUrl: 'https://www.nasa.gov/image-article/kepler-186-solar-system/'
+            },
+            {
+              id: 'k_d', name: 'Kepler-186d', shortName: '186d', orbitRadius: 17.5, radius: 1.15, speed: 0.44, tilt: 0.06, rotSpeed: 0.26,
+              textureType: 'mercury', color: '#fb923c', subtitle: '৩য় পাথুরে গ্রহ',
+              description: 'নক্ষত্রের কাছাকাছি থাকা তৃতীয় পাথুরে গ্রহ।',
+              stats: [{ label: 'অবস্থান', value: '৩য় গ্রহ' }, { label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'নক্ষত্র', value: 'Kepler-186' }, { label: 'দূরত্ব', value: '৫৮০ আলোকবর্ষ' }],
+              sourceName: 'NASA Kepler-186', sourceUrl: 'https://www.nasa.gov/image-article/kepler-186-solar-system/'
+            },
+            {
+              id: 'k_e', name: 'Kepler-186e', shortName: '186e', orbitRadius: 21.8, radius: 1.12, speed: 0.34, tilt: 0.06, rotSpeed: 0.24,
+              textureType: 'proxima_b', color: '#eab308', subtitle: '৪র্থ অভ্যন্তরীণ গ্রহ',
+              description: 'বাসযোগ্য অঞ্চলের ঠিক ভেতরের দিকে অবস্থিত চতুর্থ গ্রহ।',
+              stats: [{ label: 'অবস্থান', value: '৪র্থ গ্রহ' }, { label: 'ধরন', value: 'পাথুরে গ্রহ' }, { label: 'নক্ষত্র', value: 'Kepler-186' }, { label: 'দূরত্ব', value: '৫৮০ আলোকবর্ষ' }],
+              sourceName: 'NASA Kepler-186', sourceUrl: 'https://www.nasa.gov/image-article/kepler-186-solar-system/'
+            },
+            {
+              id: 'k_f', name: 'Kepler-186f', shortName: '💠 186f (বাসযোগ্য)', orbitRadius: 28.5, radius: 1.45, speed: 0.22, tilt: 0.16, rotSpeed: 0.36,
+              textureType: 'kepler_186f', hasClouds: true, color: '#22d3ee', atmosphereColor: '#67e8f9',
+              subtitle: 'বাসযোগ্য অঞ্চলের প্রথম পৃথিবী-আকারের এক্সোপ্ল্যানেট (শিল্পী কল্পনা)',
+              description:
+                '২০১৪ সালে আবিষ্কৃত Kepler-186f হলো অন্য নক্ষত্রের বাসযোগ্য অঞ্চলে পাওয়া প্রথম পৃথিবী-আকারের গ্রহ। এর ব্যাসার্ধ পৃথিবীর প্রায় ১.১৭ গুণ এবং এটি প্রায় ১৩০ দিনে নক্ষত্রকে একবার প্রদক্ষিণ করে। লাল বামন নক্ষত্রের আলোয় এখানকার সম্ভাব্য উদ্ভিদ লালচে-কমলা রঙের হতে পারে বলে বিজ্ঞানীরা কল্পনা করেন।',
+              stats: [
+                { label: 'ব্যাসার্ধ', value: 'পৃথিবীর ~১.১৭ গুণ' },
+                { label: 'কক্ষপথ কাল', value: 'প্রায় ১৩০ দিন' },
+                { label: 'নক্ষত্র থেকে দূরত্ব', value: 'প্রায় ০.৪৩ AU' },
+                { label: 'পৃথিবী থেকে দূরত্ব', value: 'প্রায় ৫৮০ আলোকবর্ষ' }
+              ],
+              sourceName: 'NASA — Kepler-186f',
+              sourceUrl: 'https://www.nasa.gov/news-release/nasas-kepler-telescope-discovers-first-earth-size-planet-in-habitable-zone/'
+            }
+          ]
+        }
+      };
+
+      const CAMERA_PRESETS = {
+        overview: { mode: 'galaxy', theta: 0.55, phi: 0.96, radius: 112, target: [0, 0, 0], landmarkId: 'milkyway' },
+        top: { mode: 'galaxy', theta: 0.0, phi: 0.08, radius: 125, target: [0, 0, 0], landmarkId: 'milkyway' },
+        edge: { mode: 'galaxy', theta: 0.4, phi: 1.53, radius: 115, target: [0, 0, 0], landmarkId: 'milkyway' },
+        core: { mode: 'galaxy', theta: 0.45, phi: 1.18, radius: 18, target: [0, 0, 0], landmarkId: 'core' },
+        solar: { mode: 'system', systemId: 'solar' },
+        earth: { mode: 'planet', systemId: 'solar', planetId: 'earth' },
+        proxima: { mode: 'planet', systemId: 'proxima', planetId: 'proxima_b' },
+        trappist: { mode: 'system', systemId: 'trappist' },
+        kepler186: { mode: 'planet', systemId: 'kepler186', planetId: 'k_f' },
+        halo: { mode: 'galaxy', theta: 1.25, phi: 1.05, radius: 162, target: [0, 0, 0], landmarkId: 'halo', enableHalo: true }
+      };
+
+      const DENSITY_CONFIG = {
+        low: { stars: 14000, nebulae: 700 },
+        medium: { stars: 26000, nebulae: 1200 },
+        high: { stars: 40000, nebulae: 1800 }
+      };
+
+      // =========================================================================
+      // 3. APPLICATION STATE
+      // =========================================================================
+      const state = {
+        viewMode: 'galaxy', // 'galaxy' | 'system' | 'planet'
+        activeLandmarkId: 'milkyway',
+        activeSystemId: 'solar',
+        activePlanetId: null,
+        activePreset: 'overview',
+        isPlaying: true,
+        rotationSpeed: 1.0,
+        elapsedMyr: 0,
+        elapsedDays: 0,
+        density: 'medium',
+        layers: {
+          stars: true,
+          nebulae: true,
+          orbit: true,
+          labels: true,
+          halo: false
+        },
+        soundEnabled: false
+      };
+
+      const camState = {
+        theta: 0.55,
+        phi: 0.96,
+        radius: 112,
+        targetTheta: 0.55,
+        targetPhi: 0.96,
+        targetRadius: 112,
+        target: new THREE.Vector3(0, 0, 0),
+        desiredTarget: new THREE.Vector3(0, 0, 0)
+      };
+
+      const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+      function toBn(val) {
+        return String(val).replace(/[0-9]/g, (d) => BN_DIGITS[Number(d)]);
+      }
+
+      function triggerWarpFlash() {
+        const el = document.getElementById('transition-flash');
+        el.style.opacity = '0.85';
+        setTimeout(() => { el.style.opacity = '0'; }, 180);
+      }
+
+      // =========================================================================
+      // 4. THREE.JS HIGH-DPI ENGINE & PROCEDURAL TEXTURE LAB
+      // =========================================================================
+      const container = document.getElementById('canvas-container');
+      const labelsLayer = document.getElementById('labels-layer');
+
+      let renderer;
+      try {
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: false,
+          logarithmicDepthBuffer: true,
+          powerPreference: 'high-performance'
+        });
+      } catch (err) {
+        document.getElementById('webgl-fallback').classList.remove('hidden');
+        return;
+      }
+
+      renderer.setClearColor(0x02030a, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.05, 2200);
+
+      // Lighting for razor-sharp 3D planets
+      const ambientLight = new THREE.AmbientLight(0x283554, 0.55);
+      scene.add(ambientLight);
+
+      const systemStarLight = new THREE.PointLight(0xfff5e0, 2.4, 320, 0.6);
+      scene.add(systemStarLight);
+
+      const rimFillLight = new THREE.DirectionalLight(0x5b82d6, 0.35);
+      rimFillLight.position.set(-40, 25, -40);
+      scene.add(rimFillLight);
+
+      // Scene Root Groups
+      const galaxyRoot = new THREE.Group();
+      const galaxyGroup = new THREE.Group();
+      const starsGroup = new THREE.Group();
+      const nebulaeGroup = new THREE.Group();
+      const orbitGroup = new THREE.Group();
+      const haloGroup = new THREE.Group();
+      const neighborsGroup = new THREE.Group();
+
+      galaxyGroup.add(starsGroup, nebulaeGroup, orbitGroup, haloGroup);
+      galaxyRoot.add(galaxyGroup, neighborsGroup);
+      scene.add(galaxyRoot);
+
+      const systemRoot = new THREE.Group();
+      systemRoot.visible = false;
+      scene.add(systemRoot);
+
+      // Deterministic PRNG & Value Noise for crisp procedural planetary textures
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function gaussianRandom(rand) {
+        const u1 = Math.max(1e-6, rand());
+        const u2 = rand();
+        return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+      }
+
+      // Sharp pinpoint star texture (NOT muddy blobs!)
+      function createPinpointStarTexture() {
+        const size = 64;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0.0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.14, 'rgba(255,255,255,0.92)');
+        g.addColorStop(0.32, 'rgba(185,215,255,0.32)');
+        g.addColorStop(0.62, 'rgba(110,155,255,0.06)');
+        g.addColorStop(1.0, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function createGlowTexture(innerColor, midColor, outerColor) {
+        const size = 128;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0.0, innerColor);
+        g.addColorStop(0.3, midColor);
+        g.addColorStop(0.68, outerColor);
+        g.addColorStop(1.0, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      const starTexture = createPinpointStarTexture();
+      const nebulaTexture = createGlowTexture('rgba(255,255,255,0.38)', 'rgba(195,150,255,0.14)', 'rgba(70,95,210,0.02)');
+      const coreGlowTexture = createGlowTexture('rgba(255,250,230,0.95)', 'rgba(255,200,115,0.36)', 'rgba(255,130,60,0.03)');
+
+      // Cached high-res procedural planet textures (1024x512 for Earth, 512x256 for others)
+      const textureCache = {};
+
+      function getPlanetTexture(type) {
+        if (textureCache[type]) return textureCache[type];
+
+        const isEarth = type === 'earth';
+        const w = isEarth ? 1024 : 512;
+        const h = isEarth ? 512 : 256;
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        const rand = mulberry32(type.split('').reduce((acc, ch) => acc * 31 + ch.charCodeAt(0), 17));
+
+        if (type === 'earth') {
+          // 1. Deep ocean bathymetry gradient
+          const oceanGrad = ctx.createLinearGradient(0, 0, 0, h);
+          oceanGrad.addColorStop(0.0, '#103b66');
+          oceanGrad.addColorStop(0.2, '#0b3a6e');
+          oceanGrad.addColorStop(0.5, '#074886');
+          oceanGrad.addColorStop(0.8, '#0b3a6e');
+          oceanGrad.addColorStop(1.0, '#103b66');
+          ctx.fillStyle = oceanGrad;
+          ctx.fillRect(0, 0, w, h);
+
+          // Subtle turquoise continental shelf glow helper
+          function drawContinent(pts, fill, desertFill) {
+            ctx.save();
+            ctx.beginPath();
+            pts.forEach((p, idx) => {
+              const px = p[0] * w;
+              const py = p[1] * h;
+              if (idx === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            });
+            ctx.closePath();
+            ctx.shadowColor = 'rgba(56, 189, 248, 0.55)';
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            if (desertFill) {
+              ctx.clip();
+              ctx.fillStyle = desertFill;
+              for (let i = 0; i < 14; i++) {
+                const base = pts[Math.floor(rand() * pts.length)];
+                ctx.beginPath();
+                ctx.ellipse(
+                  base[0] * w + (rand() - 0.5) * 65,
+                  base[1] * h + (rand() - 0.5) * 35,
+                  18 + rand() * 32,
+                  10 + rand() * 18,
+                  rand() * Math.PI,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.fill();
+              }
+            }
+            ctx.restore();
+          }
+
+          // Stylized recognizable Earth continents (equirectangular layout)
+          // North America
+          drawContinent(
+            [[0.08,0.18],[0.16,0.14],[0.26,0.19],[0.29,0.29],[0.25,0.39],[0.21,0.44],[0.17,0.41],[0.13,0.32],[0.09,0.24]],
+            '#2f7d44', 'rgba(182, 160, 102, 0.45)'
+          );
+          // South America
+          drawContinent(
+            [[0.23,0.47],[0.29,0.50],[0.34,0.58],[0.31,0.72],[0.27,0.82],[0.24,0.75],[0.22,0.58]],
+            '#2a7a3e', 'rgba(160, 148, 92, 0.35)'
+          );
+          // Greenland
+          drawContinent(
+            [[0.33,0.09],[0.41,0.08],[0.42,0.16],[0.36,0.19],[0.32,0.14]],
+            '#dce9f5', null
+          );
+          // Europe
+          drawContinent(
+            [[0.46,0.28],[0.49,0.19],[0.57,0.16],[0.62,0.22],[0.58,0.30],[0.51,0.31]],
+            '#3b8248', 'rgba(145, 165, 95, 0.3)'
+          );
+          // Africa
+          drawContinent(
+            [[0.46,0.34],[0.56,0.33],[0.63,0.41],[0.62,0.55],[0.56,0.72],[0.51,0.70],[0.47,0.52],[0.44,0.42]],
+            '#3e7f42', 'rgba(214, 180, 114, 0.72)'
+          );
+          // Asia + Indian Subcontinent
+          drawContinent(
+            [[0.59,0.16],[0.72,0.14],[0.86,0.19],[0.91,0.28],[0.85,0.42],[0.78,0.44],[0.74,0.50],[0.70,0.49],[0.68,0.40],[0.62,0.36],[0.58,0.27]],
+            '#367c43', 'rgba(196, 170, 110, 0.55)'
+          );
+          // Australia
+          drawContinent(
+            [[0.80,0.61],[0.89,0.59],[0.92,0.68],[0.88,0.75],[0.80,0.72]],
+            '#b88248', 'rgba(62, 128, 68, 0.45)'
+          );
+
+          // Crisp topographic micro-detail & mountain chains
+          for (let i = 0; i < 420; i++) {
+            const x = rand() * w;
+            const y = (0.14 + rand() * 0.72) * h;
+            ctx.fillStyle = rand() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(10,30,18,0.08)';
+            ctx.beginPath();
+            ctx.arc(x, y, 1 + rand() * 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Arctic & Antarctic Polar Ice Caps
+          const northIce = ctx.createLinearGradient(0, 0, 0, h * 0.11);
+          northIce.addColorStop(0, '#f8fafc');
+          northIce.addColorStop(0.7, '#e2eef8');
+          northIce.addColorStop(1, 'rgba(226,238,248,0)');
+          ctx.fillStyle = northIce;
+          ctx.fillRect(0, 0, w, h * 0.11);
+
+          const southIce = ctx.createLinearGradient(0, h * 0.87, 0, h);
+          southIce.addColorStop(0, 'rgba(240,247,255,0)');
+          southIce.addColorStop(0.35, '#e6f1fa');
+          southIce.addColorStop(1, '#ffffff');
+          ctx.fillStyle = southIce;
+          ctx.fillRect(0, h * 0.87, w, h * 0.13);
+        } else if (type === 'earth_clouds') {
+          ctx.clearRect(0, 0, w, h);
+          for (let i = 0; i < 240; i++) {
+            const cx = rand() * w;
+            const cy = (0.08 + rand() * 0.84) * h;
+            const rx = 18 + rand() * 72;
+            const ry = 4 + rand() * 14;
+            const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, rx);
+            grad.addColorStop(0, 'rgba(255,255,255,0.62)');
+            grad.addColorStop(0.55, 'rgba(240,248,255,0.24)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((rand() - 0.5) * 0.35);
+            ctx.scale(1, ry / rx);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, rx, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        } else if (type === 'moon' || type === 'mercury') {
+          ctx.fillStyle = type === 'moon' ? '#9ca3af' : '#8b857e';
+          ctx.fillRect(0, 0, w, h);
+          // Maria / dark plains
+          for (let i = 0; i < 38; i++) {
+            ctx.fillStyle = 'rgba(55, 58, 66, 0.28)';
+            ctx.beginPath();
+            ctx.ellipse(rand() * w, rand() * h, 14 + rand() * 44, 10 + rand() * 28, rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Crisp craters
+          for (let i = 0; i < 190; i++) {
+            const x = rand() * w, y = rand() * h, r = 2 + rand() * 11;
+            ctx.fillStyle = 'rgba(40, 42, 48, 0.42)';
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(230, 235, 245, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(x - r * 0.12, y - r * 0.12, r * 0.92, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (type === 'mars') {
+          const g = ctx.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, '#f1f5f9');
+          g.addColorStop(0.08, '#c2532b');
+          g.addColorStop(0.5, '#d96736');
+          g.addColorStop(0.92, '#b84b26');
+          g.addColorStop(1, '#f1f5f9');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 85; i++) {
+            ctx.fillStyle = rand() > 0.45 ? 'rgba(92, 32, 16, 0.34)' : 'rgba(244, 152, 92, 0.25)';
+            ctx.beginPath();
+            ctx.ellipse(rand() * w, (0.1 + rand() * 0.8) * h, 12 + rand() * 48, 6 + rand() * 20, rand() * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (type === 'venus') {
+          const g = ctx.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, '#d8b473');
+          g.addColorStop(0.35, '#f2d399');
+          g.addColorStop(0.65, '#e2b56b');
+          g.addColorStop(1, '#caa05a');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 60; i++) {
+            ctx.fillStyle = rand() > 0.5 ? 'rgba(255, 246, 220, 0.22)' : 'rgba(176, 122, 48, 0.2)';
+            ctx.fillRect(0, rand() * h, w, 3 + rand() * 14);
+          }
+        } else if (type === 'jupiter') {
+          const bands = ['#d9c2a3','#b97a4f','#e7d7be','#9e5a36','#e2cfb3','#c68e5e','#d4b48c','#8c5233','#e0cba8'];
+          const bh = h / bands.length;
+          bands.forEach((col, idx) => {
+            ctx.fillStyle = col;
+            ctx.fillRect(0, idx * bh, w, bh + 2);
+          });
+          // Turbulent streaks
+          for (let i = 0; i < 120; i++) {
+            ctx.fillStyle = rand() > 0.5 ? 'rgba(255,245,230,0.16)' : 'rgba(110,55,25,0.16)';
+            ctx.fillRect(rand() * w, rand() * h, 35 + rand() * 120, 2 + rand() * 6);
+          }
+          // Great Red Spot
+          ctx.fillStyle = '#c2412d';
+          ctx.beginPath();
+          ctx.ellipse(w * 0.62, h * 0.64, 34, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,220,190,0.6)';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        } else if (type === 'saturn') {
+          const bands = ['#d8c596','#e8d8ad','#c8b07e','#efe2bd','#c5ab76','#e2cfa1','#b99d68'];
+          const bh = h / bands.length;
+          bands.forEach((col, idx) => {
+            ctx.fillStyle = col;
+            ctx.fillRect(0, idx * bh, w, bh + 2);
+          });
+          for (let i = 0; i < 70; i++) {
+            ctx.fillStyle = 'rgba(255,250,235,0.12)';
+            ctx.fillRect(0, rand() * h, w, 2 + rand() * 6);
+          }
+        } else if (type === 'uranus' || type === 'neptune') {
+          const g = ctx.createLinearGradient(0, 0, 0, h);
+          if (type === 'uranus') {
+            g.addColorStop(0, '#a5f3fc'); g.addColorStop(0.5, '#67e8f9'); g.addColorStop(1, '#22d3ee');
+          } else {
+            g.addColorStop(0, '#1e3a8a'); g.addColorStop(0.45, '#2563eb'); g.addColorStop(0.75, '#1d4ed8'); g.addColorStop(1, '#172554');
+          }
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 45; i++) {
+            ctx.fillStyle = type === 'neptune' ? 'rgba(147,197,253,0.18)' : 'rgba(255,255,255,0.12)';
+            ctx.fillRect(0, rand() * h, w, 2 + rand() * 8);
+          }
+        } else if (type === 'proxima_b') {
+          // Arid crimson-ochre rocky super-Earth with twilight ocean basins
+          const g = ctx.createLinearGradient(0, 0, w, h);
+          g.addColorStop(0, '#7c2d12');
+          g.addColorStop(0.45, '#b45309');
+          g.addColorStop(0.75, '#1e3a5f');
+          g.addColorStop(1, '#7c2d12');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 65; i++) {
+            ctx.fillStyle = rand() > 0.4 ? 'rgba(234, 88, 12, 0.35)' : 'rgba(56, 189, 248, 0.32)';
+            ctx.beginPath();
+            ctx.ellipse(rand() * w, rand() * h, 18 + rand() * 54, 10 + rand() * 28, rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (type === 'trappist_e') {
+          // Deep ocean exoplanet with rocky archipelagos & icy rim
+          ctx.fillStyle = '#0c4a6e';
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 35; i++) {
+            ctx.fillStyle = rand() > 0.35 ? '#3f6212' : '#9a6b3f';
+            ctx.beginPath();
+            ctx.ellipse(rand() * w, (0.15 + rand() * 0.7) * h, 14 + rand() * 42, 10 + rand() * 26, rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(224,242,254,0.85)';
+          ctx.fillRect(0, 0, w, h * 0.14);
+          ctx.fillRect(0, h * 0.86, w, h * 0.14);
+        } else if (type === 'kepler_186f') {
+          // Deep oceanic habitable-zone world with reddish-amber vegetation continents (under red dwarf light)
+          ctx.fillStyle = '#0f3d5e';
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 42; i++) {
+            ctx.fillStyle = rand() > 0.4 ? '#9f3a38' : '#b4532a';
+            ctx.beginPath();
+            ctx.ellipse(rand() * w, (0.14 + rand() * 0.72) * h, 16 + rand() * 50, 10 + rand() * 28, rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(241,245,249,0.8)';
+          ctx.fillRect(0, 0, w, h * 0.11);
+          ctx.fillRect(0, h * 0.89, w, h * 0.11);
+        } else if (type === 'sun_yellow' || type === 'sun_red') {
+          ctx.fillStyle = type === 'sun_yellow' ? '#ffb703' : '#dc2626';
+          ctx.fillRect(0, 0, w, h);
+          for (let i = 0; i < 360; i++) {
+            ctx.fillStyle =
+              type === 'sun_yellow'
+                ? rand() > 0.45 ? 'rgba(255, 248, 200, 0.5)' : 'rgba(234, 88, 12, 0.42)'
+                : rand() > 0.45 ? 'rgba(255, 160, 110, 0.5)' : 'rgba(127, 29, 29, 0.45)';
+            ctx.beginPath();
+            ctx.arc(rand() * w, rand() * h, 4 + rand() * 18, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        tex.needsUpdate = true;
+        textureCache[type] = tex;
+        return tex;
+      }
+
+      // =========================================================================
+      // 5. BUILD MILKY WAY GALAXY (SCALE 1)
+      // =========================================================================
+      function clearGroup(group) {
+        while (group.children.length > 0) {
+          const obj = group.children[0];
+          group.remove(obj);
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+            else obj.material.dispose();
+          }
+        }
+      }
+
+      function buildGalaxyParticles(densityKey) {
+        clearGroup(starsGroup);
+        clearGroup(nebulaeGroup);
+
+        const cfg = DENSITY_CONFIG[densityKey] || DENSITY_CONFIG.medium;
+        const rand = mulberry32(42108);
+
+        const totalStars = cfg.stars;
+        const positions = new Float32Array(totalStars * 3);
+        const colors = new Float32Array(totalStars * 3);
+
+        const colorCore = new THREE.Color('#fff5d9');
+        const colorBar = new THREE.Color('#ffd08a');
+        const colorMajorBlue = new THREE.Color('#8ec5ff');
+        const colorHotWhite = new THREE.Color('#f4f9ff');
+        const colorMinorPink = new THREE.Color('#f0abfc');
+        const colorOuterGold = new THREE.Color('#fde68a');
+        const tmpColor = new THREE.Color();
+
+        const barAngle = 0.45;
+        const arms = [
+          { offset: barAngle, major: true },
+          { offset: barAngle + Math.PI, major: true },
+          { offset: barAngle + Math.PI * 0.52, major: false },
+          { offset: barAngle + Math.PI * 1.52, major: false }
+        ];
+
+        for (let i = 0; i < totalStars; i++) {
+          const i3 = i * 3;
+          const p = rand();
+          let x = 0, y = 0, z = 0;
+
+          if (p < 0.16) {
+            const r = Math.abs(gaussianRandom(rand)) * 4.6;
+            const theta = rand() * Math.PI * 2;
+            const phi = Math.acos(2 * rand() - 1);
+            x = r * Math.sin(phi) * Math.cos(theta) * 1.35;
+            y = r * Math.cos(phi) * 0.58;
+            z = r * Math.sin(phi) * Math.sin(theta) * 1.1;
+            tmpColor.copy(colorCore).lerp(colorBar, Math.min(1, r / 7));
+          } else if (p < 0.27) {
+            const along = (rand() - 0.5) * 20;
+            const across = gaussianRandom(rand) * 1.95;
+            const cosB = Math.cos(barAngle);
+            const sinB = Math.sin(barAngle);
+            x = along * cosB - across * sinB;
+            z = along * sinB + across * cosB;
+            y = gaussianRandom(rand) * (1.4 * Math.exp(-Math.abs(along) / 14) + 0.4);
+            tmpColor.copy(colorBar).lerp(colorCore, Math.max(0, 1 - Math.abs(along) / 11));
+          } else if (p < 0.31) {
+            const t = rand();
+            const r = 21 + t * 11;
+            const spiralAngle = 0.65 + t * 0.58;
+            x = Math.cos(spiralAngle) * r + gaussianRandom(rand) * 1.3;
+            z = Math.sin(spiralAngle) * r + gaussianRandom(rand) * 1.3;
+            y = gaussianRandom(rand) * 0.48;
+            tmpColor.copy(colorHotWhite).lerp(colorMajorBlue, rand() * 0.6);
+          } else {
+            const armPick = rand();
+            const arm = armPick < 0.33 ? arms[0] : armPick < 0.66 ? arms[1] : armPick < 0.83 ? arms[2] : arms[3];
+            const r = 7.5 + Math.pow(rand(), 0.78) * 44.5;
+            const winding = 0.24 * Math.pow(r, 0.76);
+            const scatterWidth = (arm.major ? 2.4 : 3.2) * (0.45 + r / 48);
+            const angle = arm.offset + winding + (gaussianRandom(rand) * scatterWidth) / Math.max(8, r);
+            x = Math.cos(angle) * r + gaussianRandom(rand) * 1.0;
+            z = Math.sin(angle) * r + gaussianRandom(rand) * 1.0;
+            y = gaussianRandom(rand) * (0.5 + 1.5 * Math.exp(-r / 13));
+
+            const tRad = Math.min(1, r / 50);
+            if (arm.major) {
+              tmpColor.copy(colorBar).lerp(colorMajorBlue, Math.min(1, tRad * 1.25));
+              if (rand() < 0.28) tmpColor.lerp(colorHotWhite, 0.72);
+            } else {
+              tmpColor.copy(colorBar).lerp(colorMinorPink, tRad * 0.65);
+              if (rand() < 0.35) tmpColor.lerp(colorMajorBlue, 0.55);
+            }
+            if (rand() < 0.12) tmpColor.lerp(colorOuterGold, 0.55);
+          }
+
+          positions[i3] = x;
+          positions[i3 + 1] = y;
+          positions[i3 + 2] = z;
+
+          const brightness = 0.62 + rand() * 0.38;
+          colors[i3] = tmpColor.r * brightness;
+          colors[i3 + 1] = tmpColor.g * brightness;
+          colors[i3 + 2] = tmpColor.b * brightness;
+        }
+
+        const starGeo = new THREE.BufferGeometry();
+        starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        // Crisp pinpoint size so zooming in stays sharp!
+        const starMat = new THREE.PointsMaterial({
+          size: 0.92,
+          map: starTexture,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.96,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          sizeAttenuation: true
+        });
+        starsGroup.add(new THREE.Points(starGeo, starMat));
+
+        // Subtle Nebulae
+        const totalNeb = cfg.nebulae;
+        const nebPos = new Float32Array(totalNeb * 3);
+        const nebCol = new Float32Array(totalNeb * 3);
+        const nebPalette = [
+          new THREE.Color('#6366f1'),
+          new THREE.Color('#ec4899'),
+          new THREE.Color('#3b82f6'),
+          new THREE.Color('#a855f7'),
+          new THREE.Color('#f59e0b')
+        ];
+
+        for (let i = 0; i < totalNeb; i++) {
+          const i3 = i * 3;
+          const arm = arms[i % arms.length];
+          const r = 8 + Math.pow(rand(), 0.82) * 41;
+          const winding = 0.24 * Math.pow(r, 0.76);
+          const angle = arm.offset + winding + (gaussianRandom(rand) * 2.1) / Math.max(9, r);
+
+          nebPos[i3] = Math.cos(angle) * r + gaussianRandom(rand) * 1.4;
+          nebPos[i3 + 1] = gaussianRandom(rand) * 0.6;
+          nebPos[i3 + 2] = Math.sin(angle) * r + gaussianRandom(rand) * 1.4;
+
+          const baseC = r < 14 ? nebPalette[4] : nebPalette[Math.floor(rand() * 4)];
+          const dim = 0.22 + rand() * 0.25;
+          nebCol[i3] = baseC.r * dim;
+          nebCol[i3 + 1] = baseC.g * dim;
+          nebCol[i3 + 2] = baseC.b * dim;
+        }
+
+        const nebGeo = new THREE.BufferGeometry();
+        nebGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+        nebGeo.setAttribute('color', new THREE.BufferAttribute(nebCol, 3));
+        nebulaeGroup.add(
+          new THREE.Points(
+            nebGeo,
+            new THREE.PointsMaterial({
+              size: 5.8,
+              map: nebulaTexture,
+              vertexColors: true,
+              transparent: true,
+              opacity: 0.3,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+              sizeAttenuation: true
+            })
+          )
+        );
+
+        const coreSprite = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: coreGlowTexture,
+            color: 0xffdf9e,
+            transparent: true,
+            opacity: 0.7,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        coreSprite.scale.set(30, 20, 1);
+        nebulaeGroup.add(coreSprite);
+      }
+
+      // Sagittarius A* Black Hole + Accretion Disk + Lensing Ring
+      const bhCore = new THREE.Mesh(
+        new THREE.SphereGeometry(1.1, 48, 48),
+        new THREE.MeshBasicMaterial({ color: 0x010104 })
+      );
+      galaxyGroup.add(bhCore);
+
+      const accretionRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.32, 2.9, 96),
+        new THREE.MeshBasicMaterial({
+          color: 0xff9f38,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.88,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      accretionRing.rotation.x = Math.PI / 2 - 0.18;
+      galaxyGroup.add(accretionRing);
+
+      const photonRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.16, 1.38, 96),
+        new THREE.MeshBasicMaterial({
+          color: 0xfff7d6,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.96,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      photonRing.rotation.x = Math.PI / 2 - 0.18;
+      galaxyGroup.add(photonRing);
+
+      // Solar System Orbit Ring in Galaxy
+      const solarGalPos = new THREE.Vector3(15.5, 0.25, 20.8);
+      const solarGalRadius = Math.hypot(solarGalPos.x, solarGalPos.z);
+      const galOrbitPts = [];
+      for (let i = 0; i <= 128; i++) {
+        const a = (i / 128) * Math.PI * 2;
+        galOrbitPts.push(new THREE.Vector3(Math.cos(a) * solarGalRadius, 0.2, Math.sin(a) * solarGalRadius));
+      }
+      orbitGroup.add(
+        new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(galOrbitPts),
+          new THREE.LineBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.42 })
+        )
+      );
+
+      const sunRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.45, 36),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+      );
+      sunRing.position.copy(solarGalPos);
+      sunRing.rotation.x = Math.PI / 2;
+      orbitGroup.add(sunRing);
+
+      // Halo, Globular Clusters & Deep Space Background
+      function buildHaloAndDeepSpace() {
+        const rand = mulberry32(9911);
+        haloGroup.add(
+          new THREE.Mesh(
+            new THREE.SphereGeometry(76, 32, 24),
+            new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true, transparent: true, opacity: 0.08 })
+          )
+        );
+        const dmCount = 1200;
+        const dmPos = new Float32Array(dmCount * 3);
+        const dmCol = new Float32Array(dmCount * 3);
+        const c1 = new THREE.Color('#6366f1'), c2 = new THREE.Color('#a855f7'), cTmp = new THREE.Color();
+        for (let i = 0; i < dmCount; i++) {
+          const i3 = i * 3;
+          const r = 38 + Math.pow(rand(), 0.7) * 44;
+          const theta = rand() * Math.PI * 2, phi = Math.acos(2 * rand() - 1);
+          dmPos[i3] = r * Math.sin(phi) * Math.cos(theta);
+          dmPos[i3 + 1] = r * Math.cos(phi);
+          dmPos[i3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+          cTmp.copy(c1).lerp(c2, rand());
+          dmCol[i3] = cTmp.r * 0.5; dmCol[i3 + 1] = cTmp.g * 0.5; dmCol[i3 + 2] = cTmp.b * 0.5;
+        }
+        const dmGeo = new THREE.BufferGeometry();
+        dmGeo.setAttribute('position', new THREE.BufferAttribute(dmPos, 3));
+        dmGeo.setAttribute('color', new THREE.BufferAttribute(dmCol, 3));
+        haloGroup.add(
+          new THREE.Points(
+            dmGeo,
+            new THREE.PointsMaterial({ size: 4.0, map: nebulaTexture, vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending })
+          )
+        );
+        haloGroup.visible = state.layers.halo;
+
+        // Global Crisp Background Starfield (visible across ALL scales: galaxy, star systems & Earth!)
+        const bgCount = 3400;
+        const bgPos = new Float32Array(bgCount * 3);
+        const bgCol = new Float32Array(bgCount * 3);
+        for (let i = 0; i < bgCount; i++) {
+          const i3 = i * 3;
+          const r = 360 + rand() * 680;
+          const theta = rand() * Math.PI * 2, phi = Math.acos(2 * rand() - 1);
+          bgPos[i3] = r * Math.sin(phi) * Math.cos(theta);
+          bgPos[i3 + 1] = r * Math.cos(phi);
+          bgPos[i3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+          const b = 0.45 + rand() * 0.55;
+          bgCol[i3] = b * (0.86 + rand() * 0.14);
+          bgCol[i3 + 1] = b * (0.89 + rand() * 0.11);
+          bgCol[i3 + 2] = b;
+        }
+        const bgGeo = new THREE.BufferGeometry();
+        bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
+        bgGeo.setAttribute('color', new THREE.BufferAttribute(bgCol, 3));
+        scene.add(
+          new THREE.Points(
+            bgGeo,
+            new THREE.PointsMaterial({
+              size: 2.1,
+              map: starTexture,
+              vertexColors: true,
+              transparent: true,
+              opacity: 0.85,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending
+            })
+          )
+        );
+
+        // LMC & Andromeda in Galaxy View
+        const lmcPos = new Float32Array(420 * 3);
+        for (let i = 0; i < 420; i++) {
+          lmcPos[i * 3] = -68 + gaussianRandom(rand) * 5;
+          lmcPos[i * 3 + 1] = -24 + gaussianRandom(rand) * 2.4;
+          lmcPos[i * 3 + 2] = 52 + gaussianRandom(rand) * 4.4;
+        }
+        const lmcGeo = new THREE.BufferGeometry();
+        lmcGeo.setAttribute('position', new THREE.BufferAttribute(lmcPos, 3));
+        neighborsGroup.add(
+          new THREE.Points(lmcGeo, new THREE.PointsMaterial({ size: 1.5, map: starTexture, color: 0xc4b5fd, transparent: true, opacity: 0.78, depthWrite: false, blending: THREE.AdditiveBlending }))
+        );
+      }
+
+      buildGalaxyParticles(state.density);
+      buildHaloAndDeepSpace();
+
+      // =========================================================================
+      // 6. BUILD RAZOR-SHARP 3D STAR SYSTEMS & PLANETS (SCALES 2 & 3)
+      // =========================================================================
+      let activeSystemObjects = {
+        starMesh: null,
+        orbitLinesGroup: null,
+        planets: [] // { data, pivot, mesh, cloudsMesh, moonPivot, moonMesh, angle }
+      };
+
+      function buildStarSystemScene(systemId) {
+        clearGroup(systemRoot);
+        activeSystemObjects = { starMesh: null, orbitLinesGroup: null, planets: [] };
+
+        const sys = STAR_SYSTEMS[systemId];
+        if (!sys) return;
+
+        const orbitLinesGroup = new THREE.Group();
+        orbitLinesGroup.visible = state.layers.orbit;
+        systemRoot.add(orbitLinesGroup);
+        activeSystemObjects.orbitLinesGroup = orbitLinesGroup;
+
+        // Host Star (High-Res Textured Sphere + Corona Glow)
+        const starGeo = new THREE.SphereGeometry(sys.star.radius, 64, 64);
+        const starMat = new THREE.MeshBasicMaterial({ map: getPlanetTexture(sys.star.textureType) });
+        const starMesh = new THREE.Mesh(starGeo, starMat);
+        systemRoot.add(starMesh);
+        activeSystemObjects.starMesh = starMesh;
+
+        const corona = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: coreGlowTexture,
+            color: new THREE.Color(sys.star.glowColor),
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        corona.scale.set(sys.star.radius * 5.2, sys.star.radius * 5.2, 1);
+        systemRoot.add(corona);
+
+        // Update PointLight tint to match host star
+        systemStarLight.color.set(sys.star.color);
+
+        // Habitable Zone Ring (বাসযোগ্য অঞ্চল)
+        if (sys.habitableZone) {
+          const hzMesh = new THREE.Mesh(
+            new THREE.RingGeometry(sys.habitableZone.inner, sys.habitableZone.outer, 128),
+            new THREE.MeshBasicMaterial({
+              color: 0x22c55e,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.08,
+              depthWrite: false
+            })
+          );
+          hzMesh.rotation.x = Math.PI / 2;
+          orbitLinesGroup.add(hzMesh);
+        }
+
+        // Planets
+        sys.planets.forEach((pData, idx) => {
+          // Crisp Orbit Ring
+          const pts = [];
+          for (let i = 0; i <= 128; i++) {
+            const a = (i / 128) * Math.PI * 2;
+            pts.push(new THREE.Vector3(Math.cos(a) * pData.orbitRadius, 0, Math.sin(a) * pData.orbitRadius));
+          }
+          const isSpecial = pData.id === 'earth' || pData.id === 'proxima_b' || pData.id === 't1_e' || pData.id === 'k_f';
+          orbitLinesGroup.add(
+            new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(pts),
+              new THREE.LineBasicMaterial({
+                color: isSpecial ? 0x38bdf8 : 0x64748b,
+                transparent: true,
+                opacity: isSpecial ? 0.55 : 0.28
+              })
+            )
+          );
+
+          // Planet container positioned along orbit
+          const startAngle = idx * 1.15 + 0.6;
+          const planetGroup = new THREE.Group();
+          planetGroup.position.set(
+            Math.cos(startAngle) * pData.orbitRadius,
+            0,
+            Math.sin(startAngle) * pData.orbitRadius
+          );
+          systemRoot.add(planetGroup);
+
+          // High-segment Sphere for razor-sharp close-up silhouette
+          const pGeo = new THREE.SphereGeometry(pData.radius, 64, 64);
+          const pMat = new THREE.MeshStandardMaterial({
+            map: getPlanetTexture(pData.textureType),
+            roughness: pData.id === 'earth' ? 0.62 : 0.82,
+            metalness: pData.id === 'earth' ? 0.08 : 0.02
+          });
+          const pMesh = new THREE.Mesh(pGeo, pMat);
+          pMesh.rotation.z = pData.tilt || 0;
+          planetGroup.add(pMesh);
+
+          // Rotating Cloud Layer (Earth, Proxima b, TRAPPIST-1e, Kepler-186f)
+          let cloudsMesh = null;
+          if (pData.hasClouds) {
+            const cGeo = new THREE.SphereGeometry(pData.radius * 1.018, 64, 64);
+            const cMat = new THREE.MeshStandardMaterial({
+              map: getPlanetTexture('earth_clouds'),
+              transparent: true,
+              opacity: pData.id === 'earth' ? 0.85 : 0.55,
+              roughness: 0.9,
+              depthWrite: false
+            });
+            cloudsMesh = new THREE.Mesh(cGeo, cMat);
+            cloudsMesh.rotation.z = pData.tilt || 0;
+            planetGroup.add(cloudsMesh);
+          }
+
+          // Atmospheric Blue/Cyan Fresnel-style Rim Halo
+          if (pData.atmosphereColor) {
+            const atmoGeo = new THREE.SphereGeometry(pData.radius * 1.065, 48, 48);
+            const atmoMat = new THREE.MeshBasicMaterial({
+              color: new THREE.Color(pData.atmosphereColor),
+              transparent: true,
+              opacity: pData.id === 'earth' ? 0.16 : 0.12,
+              side: THREE.BackSide,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false
+            });
+            planetGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
+          }
+
+          // Saturn Multi-Band Rings
+          if (pData.hasRings) {
+            const ringCanvas = document.createElement('canvas');
+            ringCanvas.width = 512;
+            ringCanvas.height = 32;
+            const rCtx = ringCanvas.getContext('2d');
+            const rg = rCtx.createLinearGradient(0, 0, 512, 0);
+            rg.addColorStop(0.0, 'rgba(0,0,0,0)');
+            rg.addColorStop(0.12, 'rgba(210,185,140,0.45)');
+            rg.addColorStop(0.32, 'rgba(235,215,170,0.9)');
+            rg.addColorStop(0.55, 'rgba(205,178,132,0.75)');
+            rg.addColorStop(0.61, 'rgba(20,18,15,0.12)'); // Cassini Division
+            rg.addColorStop(0.67, 'rgba(225,202,158,0.85)');
+            rg.addColorStop(0.92, 'rgba(180,158,122,0.35)');
+            rg.addColorStop(1.0, 'rgba(0,0,0,0)');
+            rCtx.fillStyle = rg;
+            rCtx.fillRect(0, 0, 512, 32);
+            const ringTex = new THREE.CanvasTexture(ringCanvas);
+
+            const ringGeo = new THREE.RingGeometry(pData.radius * 1.32, pData.radius * 2.45, 96);
+            // Fix radial UVs for RingGeometry
+            const posAttr = ringGeo.attributes.position;
+            const uvAttr = ringGeo.attributes.uv;
+            const v3 = new THREE.Vector3();
+            for (let i = 0; i < posAttr.count; i++) {
+              v3.fromBufferAttribute(posAttr, i);
+              const u = (v3.length() - pData.radius * 1.32) / (pData.radius * (2.45 - 1.32));
+              uvAttr.setXY(i, u, 0.5);
+            }
+            const ringMesh = new THREE.Mesh(
+              ringGeo,
+              new THREE.MeshStandardMaterial({
+                map: ringTex,
+                side: THREE.DoubleSide,
+                transparent: true,
+                roughness: 0.8
+              })
+            );
+            ringMesh.rotation.x = Math.PI / 2;
+            ringMesh.rotation.y = 0.42;
+            planetGroup.add(ringMesh);
+          } else if (pData.hasThinRing) {
+            const thinRing = new THREE.Mesh(
+              new THREE.RingGeometry(pData.radius * 1.45, pData.radius * 1.65, 64),
+              new THREE.MeshBasicMaterial({ color: 0xa5f3fc, side: THREE.DoubleSide, transparent: true, opacity: 0.25 })
+            );
+            thinRing.rotation.x = Math.PI / 2;
+            thinRing.rotation.y = 1.4;
+            planetGroup.add(thinRing);
+          }
+
+          // Orbiting Moon for Earth
+          let moonPivot = null;
+          if (pData.hasMoon) {
+            moonPivot = new THREE.Group();
+            planetGroup.add(moonPivot);
+
+            const moonOrbitPts = [];
+            const moonDist = pData.radius * 2.55;
+            for (let i = 0; i <= 64; i++) {
+              const a = (i / 64) * Math.PI * 2;
+              moonOrbitPts.push(new THREE.Vector3(Math.cos(a) * moonDist, 0, Math.sin(a) * moonDist));
+            }
+            moonPivot.add(
+              new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(moonOrbitPts),
+                new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.35 })
+              )
+            );
+
+            const moonMesh = new THREE.Mesh(
+              new THREE.SphereGeometry(pData.radius * 0.27, 40, 40),
+              new THREE.MeshStandardMaterial({ map: getPlanetTexture('moon'), roughness: 0.92 })
+            );
+            moonMesh.position.set(moonDist, 0, 0);
+            moonPivot.add(moonMesh);
+          }
+
+          activeSystemObjects.planets.push({
+            data: pData,
+            group: planetGroup,
+            mesh: pMesh,
+            cloudsMesh,
+            moonPivot,
+            angle: startAngle
+          });
+        });
+      }
+
+      // =========================================================================
+      // 7. MULTI-SCALE MODE SWITCHING & UI SYNC
+      // =========================================================================
+      let activePins = [];
+
+      function clearPins() {
+        labelsLayer.innerHTML = '';
+        activePins = [];
+      }
+
+      function rebuildPinsForCurrentMode() {
+        clearPins();
+        if (state.viewMode === 'galaxy') {
+          GALAXY_LANDMARKS.forEach((lm) => {
+            if (!lm.pinLabel) return;
+            const pin = document.createElement('button');
+            pin.type = 'button';
+            pin.className = 'landmark-pin';
+            pin.dataset.id = lm.id;
+            pin.innerHTML = `<span class="pin-dot ${lm.actionType ? 'pulse' : ''}" style="background:${lm.color}; color:${lm.color};"></span><span>${lm.pinLabel}</span>`;
+            pin.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (lm.actionType === 'enterSystem' && state.activeLandmarkId === lm.id) {
+                enterStarSystem(lm.actionTarget);
+              } else {
+                selectGalaxyLandmark(lm.id, true);
+                document.getElementById('info-panel').classList.remove('hidden');
+              }
+            });
+            labelsLayer.appendChild(pin);
+            activePins.push({
+              id: lm.id,
+              el: pin,
+              localPos: new THREE.Vector3(...lm.position),
+              rotatesWithGalaxy: true
+            });
+          });
+        } else {
+          // Star system / planet pins
+          activeSystemObjects.planets.forEach((pObj) => {
+            const pin = document.createElement('button');
+            pin.type = 'button';
+            pin.className = 'landmark-pin';
+            pin.dataset.id = pObj.data.id;
+            pin.innerHTML = `<span class="pin-dot ${pObj.data.id === 'earth' ? 'pulse' : ''}" style="background:${pObj.data.color}; color:${pObj.data.color};"></span><span>${pObj.data.shortName}</span>`;
+            pin.addEventListener('click', (e) => {
+              e.stopPropagation();
+              focusPlanet(pObj.data.id);
+              document.getElementById('info-panel').classList.remove('hidden');
+            });
+            labelsLayer.appendChild(pin);
+            activePins.push({
+              id: pObj.data.id,
+              el: pin,
+              planetObj: pObj
+            });
+          });
+        }
+      }
+
+      function updateBreadcrumbAndBadges() {
+        const badge = document.getElementById('scale-badge');
+        const sep1 = document.getElementById('crumb-sep-1');
+        const cSys = document.getElementById('crumb-system');
+        const sep2 = document.getElementById('crumb-sep-2');
+        const cPlan = document.getElementById('crumb-planet');
+        const btnBack = document.getElementById('btn-zoom-out-level');
+        const timeUnit = document.getElementById('time-unit-label');
+        const gWrap = document.getElementById('galactic-years-wrap');
+
+        if (state.viewMode === 'galaxy') {
+          badge.textContent = 'ছায়াপথ স্তর';
+          sep1.classList.add('hidden');
+          cSys.classList.add('hidden');
+          sep2.classList.add('hidden');
+          cPlan.classList.add('hidden');
+          btnBack.classList.add('hidden');
+          timeUnit.textContent = 'মিলিয়ন বছর';
+          gWrap.classList.remove('hidden');
+        } else if (state.viewMode === 'system') {
+          const sys = STAR_SYSTEMS[state.activeSystemId];
+          badge.textContent = 'নক্ষত্রমণ্ডল স্তর';
+          sep1.classList.remove('hidden');
+          cSys.classList.remove('hidden');
+          cSys.textContent = sys.name;
+          sep2.classList.add('hidden');
+          cPlan.classList.add('hidden');
+          btnBack.classList.remove('hidden');
+          timeUnit.textContent = 'পৃথিবী দিন';
+          gWrap.classList.add('hidden');
+        } else {
+          const sys = STAR_SYSTEMS[state.activeSystemId];
+          const pObj = activeSystemObjects.planets.find((p) => p.data.id === state.activePlanetId);
+          badge.textContent = 'গ্রহ ক্লোজ-আপ (HD)';
+          sep1.classList.remove('hidden');
+          cSys.classList.remove('hidden');
+          cSys.textContent = sys.name;
+          sep2.classList.remove('hidden');
+          cPlan.classList.remove('hidden');
+          cPlan.textContent = pObj ? pObj.data.name : '';
+          btnBack.classList.remove('hidden');
+          timeUnit.textContent = 'পৃথিবী দিন';
+          gWrap.classList.add('hidden');
+        }
+      }
+
+      function renderInfoCard(item) {
+        document.getElementById('info-badge').style.background = item.color || '#60a5fa';
+        document.getElementById('info-subtitle').textContent = item.subtitle || '';
+        document.getElementById('info-title').textContent = item.title || item.name || '';
+        document.getElementById('info-desc').textContent = item.description || '';
+
+        const statsEl = document.getElementById('info-stats');
+        statsEl.innerHTML = (item.stats || [])
+          .map(
+            (s) => `
+            <div class="rounded-xl bg-white/5 border border-white/10 p-2.5">
+              <div class="text-[10px] text-slate-400 leading-tight mb-0.5">${s.label}</div>
+              <div class="text-xs font-semibold text-blue-100 leading-snug">${s.value}</div>
+            </div>`
+          )
+          .join('');
+
+        const linkEl = document.getElementById('info-source-link');
+        linkEl.textContent = (item.sourceName || 'NASA Science') + ' ↗';
+        linkEl.href = item.sourceUrl || 'https://science.nasa.gov/universe/galaxies/';
+
+        const actionWrap = document.getElementById('info-action-wrap');
+        const actionBtn = document.getElementById('info-action-btn');
+        if (item.actionLabel) {
+          actionWrap.classList.remove('hidden');
+          actionBtn.textContent = item.actionLabel;
+          actionBtn.dataset.actionType = item.actionType || '';
+          actionBtn.dataset.actionTarget = item.actionTarget || '';
+        } else {
+          actionWrap.classList.add('hidden');
+        }
+      }
+
+      function rebuildSidebarChips() {
+        const chipsEl = document.getElementById('region-chips');
+        const headingEl = document.getElementById('explorer-heading');
+        chipsEl.innerHTML = '';
+
+        if (state.viewMode === 'galaxy') {
+          headingEl.textContent = 'আকাশগঙ্গার অঞ্চল ও তারামণ্ডল';
+          GALAXY_LANDMARKS.forEach((lm) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.id = lm.id;
+            const active = lm.id === state.activeLandmarkId;
+            btn.className = `px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+              active
+                ? 'bg-blue-500/35 border-blue-400/75 text-white'
+                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/15 hover:text-white'
+            }`;
+            btn.textContent = lm.shortLabel;
+            btn.addEventListener('click', () => selectGalaxyLandmark(lm.id, true));
+            chipsEl.appendChild(btn);
+          });
+        } else {
+          const sys = STAR_SYSTEMS[state.activeSystemId];
+          headingEl.textContent = sys.name + ' — গ্রহসমূহ';
+          // Overview button for the star system
+          const sysBtn = document.createElement('button');
+          sysBtn.type = 'button';
+          const isSysActive = state.viewMode === 'system';
+          sysBtn.className = `px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+            isSysActive
+              ? 'bg-amber-500/30 border-amber-400/75 text-white'
+              : 'bg-white/5 border-white/10 text-amber-200 hover:bg-white/15'
+          }`;
+          sysBtn.textContent = '✦ পুরো মণ্ডল';
+          sysBtn.addEventListener('click', () => zoomOutToSystemOverview());
+          chipsEl.appendChild(sysBtn);
+
+          sys.planets.forEach((p) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            const active = state.viewMode === 'planet' && state.activePlanetId === p.id;
+            btn.className = `px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+              active
+                ? 'bg-emerald-500/35 border-emerald-400/75 text-white'
+                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/15 hover:text-white'
+            }`;
+            btn.textContent = p.shortName;
+            btn.addEventListener('click', () => focusPlanet(p.id));
+            chipsEl.appendChild(btn);
+          });
+        }
+      }
+
+      function enterGalaxyMode(landmarkId, moveCamera) {
+        const changed = state.viewMode !== 'galaxy';
+        state.viewMode = 'galaxy';
+        state.activePlanetId = null;
+        galaxyRoot.visible = true;
+        systemRoot.visible = false;
+        if (changed) triggerWarpFlash();
+
+        rebuildPinsForCurrentMode();
+        updateBreadcrumbAndBadges();
+        selectGalaxyLandmark(landmarkId || 'milkyway', moveCamera);
+      }
+
+      function selectGalaxyLandmark(id, moveCamera) {
+        const lm = GALAXY_LANDMARKS.find((item) => item.id === id) || GALAXY_LANDMARKS[0];
+        state.activeLandmarkId = lm.id;
+        renderInfoCard(lm);
+        rebuildSidebarChips();
+
+        activePins.forEach((p) => p.el.classList.toggle('active', p.id === lm.id));
+
+        if (lm.id === 'halo' && !state.layers.halo) {
+          state.layers.halo = true;
+          haloGroup.visible = true;
+          document.getElementById('toggle-halo').checked = true;
+        }
+
+        if (moveCamera && lm.camera) {
+          camState.targetTheta = lm.camera.theta;
+          camState.targetPhi = lm.camera.phi;
+          camState.targetRadius = lm.camera.radius;
+          const v = new THREE.Vector3(...lm.camera.target);
+          v.applyAxisAngle(new THREE.Vector3(0, 1, 0), galaxyGroup.rotation.y);
+          camState.desiredTarget.copy(v);
+        }
+      }
+
+      function enterStarSystem(systemId, autoPlanetId) {
+        const sys = STAR_SYSTEMS[systemId];
+        if (!sys) return;
+
+        const needsBuild = state.activeSystemId !== systemId || activeSystemObjects.planets.length === 0;
+        const wasGalaxy = state.viewMode === 'galaxy';
+        state.activeSystemId = systemId;
+        state.viewMode = 'system';
+        state.activePlanetId = null;
+
+        galaxyRoot.visible = false;
+        systemRoot.visible = true;
+
+        if (needsBuild) buildStarSystemScene(systemId);
+        if (wasGalaxy || needsBuild) triggerWarpFlash();
+
+        rebuildPinsForCurrentMode();
+
+        if (autoPlanetId) {
+          focusPlanet(autoPlanetId);
+          return;
+        }
+
+        camState.targetTheta = sys.defaultCamera.theta;
+        camState.targetPhi = sys.defaultCamera.phi;
+        camState.targetRadius = sys.defaultCamera.radius;
+        camState.desiredTarget.set(0, 0, 0);
+
+        updateBreadcrumbAndBadges();
+        rebuildSidebarChips();
+        renderInfoCard({
+          title: sys.name,
+          subtitle: sys.subtitle,
+          description: sys.description,
+          color: sys.star.color,
+          stats: sys.stats,
+          sourceName: sys.sourceName,
+          sourceUrl: sys.sourceUrl,
+          actionLabel:
+            systemId === 'solar'
+              ? '🌍 একদম কাছ থেকে পৃথিবী দেখুন'
+              : systemId === 'proxima'
+                ? '🔴 Proxima b ক্লোজ-আপ দেখুন'
+                : systemId === 'trappist'
+                  ? '💧 TRAPPIST-1e ক্লোজ-আপ দেখুন'
+                  : '💠 Kepler-186f ক্লোজ-আপ দেখুন',
+          actionType: 'focusPlanet',
+          actionTarget:
+            systemId === 'solar'
+              ? 'earth'
+              : systemId === 'proxima'
+                ? 'proxima_b'
+                : systemId === 'trappist'
+                  ? 't1_e'
+                  : 'k_f'
+        });
+      }
+
+      function zoomOutToSystemOverview() {
+        const sys = STAR_SYSTEMS[state.activeSystemId];
+        if (!sys) return;
+        state.viewMode = 'system';
+        state.activePlanetId = null;
+        camState.targetTheta = sys.defaultCamera.theta;
+        camState.targetPhi = sys.defaultCamera.phi;
+        camState.targetRadius = sys.defaultCamera.radius;
+        camState.desiredTarget.set(0, 0, 0);
+        updateBreadcrumbAndBadges();
+        rebuildSidebarChips();
+        enterStarSystem(state.activeSystemId);
+      }
+
+      function focusPlanet(planetId) {
+        const pObj = activeSystemObjects.planets.find((p) => p.data.id === planetId);
+        if (!pObj) return;
+        state.viewMode = 'planet';
+        state.activePlanetId = planetId;
+
+        // Position camera close enough that the planet fills the frame in razor-sharp 3D!
+        camState.targetRadius = Math.max(3.6, pObj.data.radius * 3.8);
+        camState.targetPhi = 1.24;
+        camState.targetTheta = pObj.angle + 0.85;
+        camState.desiredTarget.copy(pObj.group.position);
+
+        updateBreadcrumbAndBadges();
+        rebuildSidebarChips();
+        activePins.forEach((p) => p.el.classList.toggle('active', p.id === planetId));
+
+        renderInfoCard({
+          title: pObj.data.name,
+          subtitle: pObj.data.subtitle,
+          description: pObj.data.description,
+          color: pObj.data.color,
+          stats: pObj.data.stats,
+          sourceName: pObj.data.sourceName,
+          sourceUrl: pObj.data.sourceUrl,
+          actionLabel: '✦ পুরো নক্ষত্রমণ্ডলে ফিরে যান',
+          actionType: 'backToSystem',
+          actionTarget: state.activeSystemId
+        });
+      }
+
+      function applyCameraPreset(presetKey) {
+        const preset = CAMERA_PRESETS[presetKey];
+        if (!preset) return;
+        state.activePreset = presetKey;
+
+        document.querySelectorAll('.view-pill').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.preset === presetKey);
+        });
+
+        if (preset.mode === 'galaxy') {
+          if (preset.enableHalo) {
+            state.layers.halo = true;
+            haloGroup.visible = true;
+            document.getElementById('toggle-halo').checked = true;
+          }
+          enterGalaxyMode(preset.landmarkId, false);
+          camState.targetTheta = preset.theta;
+          camState.targetPhi = preset.phi;
+          camState.targetRadius = preset.radius;
+          const v = new THREE.Vector3(...preset.target);
+          v.applyAxisAngle(new THREE.Vector3(0, 1, 0), galaxyGroup.rotation.y);
+          camState.desiredTarget.copy(v);
+        } else if (preset.mode === 'system') {
+          enterStarSystem(preset.systemId);
+        } else if (preset.mode === 'planet') {
+          enterStarSystem(preset.systemId, preset.planetId);
+        }
+      }
+
+      // =========================================================================
+      // 8. POINTER ORBIT, PINCH-ZOOM & SEAMLESS MULTI-SCALE ZOOM TRANSITIONS
+      // =========================================================================
+      let isDragging = false;
+      let prevX = 0, prevY = 0;
+      const activePointers = new Map();
+      let prevPinchDist = 0;
+      let zoomTransitionCooldown = 0;
+
+      const domEl = renderer.domElement;
+
+      function applyZoomDelta(delta) {
+        const now = performance.now();
+        if (state.viewMode === 'galaxy') {
+          camState.targetRadius = Math.max(10, Math.min(255, camState.targetRadius + delta));
+          // Seamless auto-dive into focused star system when zooming very close!
+          const zoomableSystems = ['solar', 'proxima', 'trappist', 'kepler186'];
+          if (camState.targetRadius <= 13 && now > zoomTransitionCooldown && state.activeLandmarkId !== 'core') {
+            const targetSys = zoomableSystems.includes(state.activeLandmarkId) ? state.activeLandmarkId : 'solar';
+            zoomTransitionCooldown = now + 900;
+            enterStarSystem(targetSys);
+          }
+        } else if (state.viewMode === 'system') {
+          camState.targetRadius = Math.max(10, Math.min(110, camState.targetRadius + delta * 0.75));
+          // Seamless zoom out back to Milky Way Galaxy when pulling far back
+          if (camState.targetRadius >= 104 && now > zoomTransitionCooldown) {
+            zoomTransitionCooldown = now + 900;
+            enterGalaxyMode(state.activeSystemId, true);
+          }
+        } else if (state.viewMode === 'planet') {
+          const pObj = activeSystemObjects.planets.find((p) => p.data.id === state.activePlanetId);
+          const minR = pObj ? Math.max(1.85, pObj.data.radius * 1.95) : 2.5;
+          camState.targetRadius = Math.max(minR, Math.min(34, camState.targetRadius + delta * 0.25));
+          // Zooming far out from planet returns seamlessly to Star System view
+          if (camState.targetRadius >= 31 && now > zoomTransitionCooldown) {
+            zoomTransitionCooldown = now + 800;
+            zoomOutToSystemOverview();
+          }
+        }
+      }
+
+      domEl.addEventListener('pointerdown', (e) => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        domEl.setPointerCapture(e.pointerId);
+        if (activePointers.size === 1) {
+          isDragging = true;
+          prevX = e.clientX;
+          prevY = e.clientY;
+        } else if (activePointers.size === 2) {
+          isDragging = false;
+          const pts = Array.from(activePointers.values());
+          prevPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+      });
+
+      domEl.addEventListener('pointermove', (e) => {
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activePointers.size === 1 && isDragging) {
+          const dx = e.clientX - prevX;
+          const dy = e.clientY - prevY;
+          prevX = e.clientX;
+          prevY = e.clientY;
+          camState.targetTheta -= dx * 0.0065;
+          camState.targetPhi = Math.max(0.08, Math.min(Math.PI - 0.08, camState.targetPhi - dy * 0.0065));
+        } else if (activePointers.size === 2) {
+          const pts = Array.from(activePointers.values());
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (prevPinchDist > 0) {
+            applyZoomDelta((prevPinchDist - dist) * 0.28);
+          }
+          prevPinchDist = dist;
+        }
+      });
+
+      function endPointer(e) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size < 2) prevPinchDist = 0;
+        if (activePointers.size === 0) isDragging = false;
+      }
+      domEl.addEventListener('pointerup', endPointer);
+      domEl.addEventListener('pointercancel', endPointer);
+
+      domEl.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          applyZoomDelta(e.deltaY * 0.065);
+        },
+        { passive: false }
+      );
+
+      // =========================================================================
+      // 9. WEB AUDIO API — SYNTHESIZED AMBIENT COSMIC SOUND
+      // =========================================================================
+      let audioCtx = null;
+      let masterGain = null;
+
+      function toggleCosmicSound() {
+        const iconEl = document.getElementById('sound-icon');
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          audioCtx = new AudioContextClass();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.0;
+          masterGain.connect(audioCtx.destination);
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 420;
+          filter.connect(masterGain);
+
+          [73.42, 110.0, 164.81, 185.0].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+            osc.frequency.value = freq;
+            g.gain.value = idx === 0 ? 0.25 : 0.1;
+            osc.connect(g);
+            g.connect(filter);
+            osc.start();
+          });
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        state.soundEnabled = !state.soundEnabled;
+        const now = audioCtx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setTargetAtTime(state.soundEnabled ? 0.18 : 0.0, now, 0.4);
+        iconEl.textContent = state.soundEnabled ? '🔊' : '🔇';
+      }
+
+      // =========================================================================
+      // 10. WIRE ALL UI CONTROLS
+      // =========================================================================
+      const controlsDrawer = document.getElementById('controls-drawer');
+      const infoPanel = document.getElementById('info-panel');
+
+      if (window.innerWidth < 768) {
+        infoPanel.classList.add('hidden');
+      }
+
+      document.getElementById('btn-toggle-controls').addEventListener('click', () => {
+        controlsDrawer.classList.toggle('hidden');
+        if (window.innerWidth < 768 && !controlsDrawer.classList.contains('hidden')) {
+          infoPanel.classList.add('hidden');
+        }
+      });
+      document.getElementById('btn-close-controls').addEventListener('click', () => controlsDrawer.classList.add('hidden'));
+
+      document.getElementById('btn-toggle-info').addEventListener('click', () => {
+        infoPanel.classList.toggle('hidden');
+        if (window.innerWidth < 768 && !infoPanel.classList.contains('hidden')) {
+          controlsDrawer.classList.add('hidden');
+        }
+      });
+      document.getElementById('btn-close-info').addEventListener('click', () => infoPanel.classList.add('hidden'));
+
+      document.getElementById('btn-reset-view').addEventListener('click', () => applyCameraPreset('overview'));
+      document.getElementById('btn-sound').addEventListener('click', toggleCosmicSound);
+
+      // Breadcrumb & Back button navigation
+      document.getElementById('crumb-galaxy').addEventListener('click', () => applyCameraPreset('overview'));
+      document.getElementById('crumb-system').addEventListener('click', () => zoomOutToSystemOverview());
+      document.getElementById('btn-zoom-out-level').addEventListener('click', () => {
+        if (state.viewMode === 'planet') zoomOutToSystemOverview();
+        else if (state.viewMode === 'system') enterGalaxyMode(state.activeSystemId, true);
+      });
+
+      // Contextual Info Card Action Button
+      document.getElementById('info-action-btn').addEventListener('click', (e) => {
+        const type = e.currentTarget.dataset.actionType;
+        const target = e.currentTarget.dataset.actionTarget;
+        if (type === 'enterSystem') enterStarSystem(target);
+        else if (type === 'focusPlanet') focusPlanet(target);
+        else if (type === 'backToSystem') zoomOutToSystemOverview();
+      });
+
+      // Play / Pause & Clock
+      document.getElementById('btn-play-pause').addEventListener('click', () => {
+        state.isPlaying = !state.isPlaying;
+        document.getElementById('play-icon').textContent = state.isPlaying ? '⏸' : '▶';
+        document.getElementById('play-label').textContent = state.isPlaying ? 'ঘূর্ণন বিরতি' : 'ঘূর্ণন চালু';
+      });
+      document.getElementById('btn-reset-clock').addEventListener('click', () => {
+        state.elapsedMyr = 0;
+        state.elapsedDays = 0;
+        updateClockReadout();
+      });
+
+      const speedSlider = document.getElementById('speed-slider');
+      speedSlider.addEventListener('input', () => {
+        state.rotationSpeed = parseFloat(speedSlider.value);
+        document.getElementById('speed-value').textContent = toBn(state.rotationSpeed.toFixed(1)) + 'x';
+      });
+
+      // Layer Toggles
+      document.getElementById('toggle-stars').addEventListener('change', (e) => {
+        state.layers.stars = e.target.checked;
+        starsGroup.visible = state.layers.stars;
+      });
+      document.getElementById('toggle-nebulae').addEventListener('change', (e) => {
+        state.layers.nebulae = e.target.checked;
+        nebulaeGroup.visible = state.layers.nebulae;
+      });
+      document.getElementById('toggle-orbit').addEventListener('change', (e) => {
+        state.layers.orbit = e.target.checked;
+        orbitGroup.visible = state.layers.orbit;
+        if (activeSystemObjects.orbitLinesGroup) activeSystemObjects.orbitLinesGroup.visible = state.layers.orbit;
+      });
+      document.getElementById('toggle-labels').addEventListener('change', (e) => {
+        state.layers.labels = e.target.checked;
+        labelsLayer.style.display = state.layers.labels ? 'block' : 'none';
+      });
+      document.getElementById('toggle-halo').addEventListener('change', (e) => {
+        state.layers.halo = e.target.checked;
+        haloGroup.visible = state.layers.halo;
+      });
+
+      // Density buttons
+      document.querySelectorAll('.density-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const d = btn.dataset.density;
+          if (d === state.density) return;
+          state.density = d;
+          document.querySelectorAll('.density-btn').forEach((b) => {
+            const active = b.dataset.density === d;
+            b.classList.toggle('bg-blue-500/30', active);
+            b.classList.toggle('border-blue-400/60', active);
+            b.classList.toggle('text-white', active);
+            b.classList.toggle('bg-white/5', !active);
+            b.classList.toggle('border-white/10', !active);
+            b.classList.toggle('text-slate-300', !active);
+          });
+          buildGalaxyParticles(d);
+        });
+      });
+
+      // Bottom presets
+      document.querySelectorAll('.view-pill').forEach((btn) => {
+        btn.addEventListener('click', () => applyCameraPreset(btn.dataset.preset));
+      });
+
+      // =========================================================================
+      // 11. ANIMATION LOOP, TELEMETRY & PIN PROJECTION
+      // =========================================================================
+      const timeMyrEl = document.getElementById('galactic-time-myr');
+      const galacticYearsEl = document.getElementById('galactic-years');
+      const scaleReadoutEl = document.getElementById('scale-readout');
+
+      function updateClockReadout() {
+        if (state.viewMode === 'galaxy') {
+          timeMyrEl.textContent = toBn(state.elapsedMyr.toFixed(1));
+          galacticYearsEl.textContent = toBn((state.elapsedMyr / 245.0).toFixed(2));
+        } else {
+          timeMyrEl.textContent = toBn(Math.floor(state.elapsedDays));
+        }
+      }
+
+      function updateScaleBar() {
+        if (state.viewMode === 'galaxy') {
+          const visH = 2 * camState.radius * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+          const pxH = Math.max(1, container.clientHeight);
+          const barLy = (28 / pxH) * visH * 1000;
+          const rounded = Math.max(500, Math.round(barLy / 500) * 500);
+          scaleReadoutEl.textContent = '~' + toBn(rounded.toLocaleString('en-IN')) + ' আলোকবর্ষ';
+        } else if (state.viewMode === 'system') {
+          scaleReadoutEl.textContent = 'নক্ষত্রমণ্ডল স্কেল (AU)';
+        } else {
+          scaleReadoutEl.textContent = 'গ্রহ ক্লোজ-আপ (হাজার কিমি)';
+        }
+      }
+
+      const projVec = new THREE.Vector3();
+      const tmpWorld = new THREE.Vector3();
+
+      function updateProjectedPins() {
+        if (!state.layers.labels) return;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+
+        activePins.forEach((item) => {
+          if (state.viewMode === 'galaxy') {
+            tmpWorld.copy(item.localPos);
+            if (item.rotatesWithGalaxy) {
+              tmpWorld.applyAxisAngle(new THREE.Vector3(0, 1, 0), galaxyGroup.rotation.y);
+            }
+          } else if (item.planetObj) {
+            // Hide active focused planet's own floating pin in close-up so it doesn't obstruct the planet
+            if (state.viewMode === 'planet' && item.id === state.activePlanetId) {
+              item.el.style.opacity = '0';
+              item.el.style.pointerEvents = 'none';
+              return;
+            }
+            tmpWorld.copy(item.planetObj.group.position);
+            tmpWorld.y += item.planetObj.data.radius + 0.9;
+          }
+
+          projVec.copy(tmpWorld).project(camera);
+          if (projVec.z > 1) {
+            item.el.style.opacity = '0';
+            item.el.style.pointerEvents = 'none';
+            return;
+          }
+
+          const x = (projVec.x * 0.5 + 0.5) * w;
+          const y = (-projVec.y * 0.5 + 0.5) * h;
+
+          if (x < -40 || x > w + 40 || y < -40 || y > h + 40) {
+            item.el.style.opacity = '0';
+            item.el.style.pointerEvents = 'none';
+          } else {
+            item.el.style.left = x + 'px';
+            item.el.style.top = y + 'px';
+            item.el.style.opacity = '1';
+            item.el.style.pointerEvents = 'auto';
+          }
+        });
+      }
+
+      let lastTime = performance.now();
+      let animFrameId = null;
+
+      function animate(now) {
+        animFrameId = requestAnimationFrame(animate);
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        if (state.viewMode === 'galaxy') {
+          if (state.isPlaying && state.rotationSpeed > 0) {
+            const angularStep = dt * 0.08 * state.rotationSpeed;
+            galaxyGroup.rotation.y -= angularStep;
+            state.elapsedMyr += (angularStep / (Math.PI * 2)) * 245.0;
+            updateClockReadout();
+          }
+          const pulse = 1 + Math.sin(now * 0.003) * 0.12;
+          sunRing.scale.set(pulse, pulse, 1);
+          accretionRing.rotation.z += dt * 0.8;
+        } else {
+          // Star system & Planet close-up animation
+          if (activeSystemObjects.starMesh) {
+            activeSystemObjects.starMesh.rotation.y += dt * 0.12;
+          }
+          if (state.isPlaying && state.rotationSpeed > 0) {
+            state.elapsedDays += dt * 18 * state.rotationSpeed;
+            updateClockReadout();
+          }
+
+          activeSystemObjects.planets.forEach((pObj) => {
+            if (state.isPlaying && state.rotationSpeed > 0) {
+              // Slow down orbital motion slightly in planet close-up so camera tracking feels buttery smooth
+              const orbitFactor = state.viewMode === 'planet' ? 0.16 : 0.42;
+              pObj.angle += dt * pObj.data.speed * orbitFactor * state.rotationSpeed;
+              pObj.group.position.set(
+                Math.cos(pObj.angle) * pObj.data.orbitRadius,
+                0,
+                Math.sin(pObj.angle) * pObj.data.orbitRadius
+              );
+              pObj.mesh.rotation.y += dt * pObj.data.rotSpeed * state.rotationSpeed;
+              if (pObj.cloudsMesh) {
+                pObj.cloudsMesh.rotation.y += dt * (pObj.data.rotSpeed * 1.28) * state.rotationSpeed;
+              }
+              if (pObj.moonPivot) {
+                pObj.moonPivot.rotation.y += dt * 0.65 * state.rotationSpeed;
+              }
+            }
+          });
+
+          // Lock camera target cleanly onto focused planet as it orbits
+          if (state.viewMode === 'planet' && state.activePlanetId) {
+            const focused = activeSystemObjects.planets.find((p) => p.data.id === state.activePlanetId);
+            if (focused) {
+              camState.desiredTarget.copy(focused.group.position);
+            }
+          }
+        }
+
+        // Smooth camera damping
+        const damp = 1 - Math.exp(-dt * 7.2);
+        camState.theta += (camState.targetTheta - camState.theta) * damp;
+        camState.phi += (camState.targetPhi - camState.phi) * damp;
+        camState.radius += (camState.targetRadius - camState.radius) * damp;
+        camState.target.lerp(camState.desiredTarget, state.viewMode === 'planet' ? 0.25 : damp);
+
+        const sinPhi = Math.sin(camState.phi);
+        camera.position.set(
+          camState.target.x + camState.radius * sinPhi * Math.sin(camState.theta),
+          camState.target.y + camState.radius * Math.cos(camState.phi),
+          camState.target.z + camState.radius * sinPhi * Math.cos(camState.theta)
+        );
+        camera.lookAt(camState.target);
+
+        updateScaleBar();
+        updateProjectedPins();
+        renderer.render(scene, camera);
+      }
+
+      window.addEventListener('resize', () => {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        camera.aspect = w / Math.max(1, h);
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      });
+
+      // Boot
+      enterGalaxyMode('milkyway', false);
+      updateClockReadout();
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      animate(performance.now());
+    })();
+  </script>
+</body>
+</html>

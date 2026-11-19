@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="bn" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>মহাবিশ্ব সিমুলেশন — My Universe Studio</title>
+  <meta name="description" content="পর্যবেক্ষণযোগ্য মহাবিশ্ব থেকে গ্রহপৃষ্ঠ পর্যন্ত বাস্তবভিত্তিক ৩ডি মহাবিশ্ব সিমুলেশন — HDR ব্লুম, প্রসিডিউরাল শেডার, ছায়াপথ, নক্ষত্র ও গ্রহ।" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body class="bg-cosmos-950 text-white overflow-hidden select-none antialiased">
+
+  <!-- Cinematic Loading Screen -->
+  <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#01020a]">
+    <div class="relative flex items-center justify-center mb-5">
+      <div class="orbit-loader"></div>
+      <span class="absolute text-2xl text-sky-300">✦</span>
+    </div>
+    <h1 class="text-xl font-bold tracking-tight text-white">মহাবিশ্ব সিমুলেশন</h1>
+    <p class="text-xs text-sky-300/80 mt-0.5">My Universe Studio • Realistic 3D Cosmos</p>
+    <div class="w-56 h-1.5 bg-white/10 rounded-full overflow-hidden mt-5">
+      <div id="loading-bar" class="h-full w-0 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 transition-all duration-300"></div>
+    </div>
+    <p id="loading-label" class="text-[11px] text-slate-400 mt-2">ইঞ্জিন প্রস্তুত হচ্ছে...</p>
+  </div>
+
+  <!-- WebGL Canvas -->
+  <canvas id="universe-canvas" class="fixed inset-0 w-full h-full"></canvas>
+
+  <!-- Projected Landmark Pins -->
+  <div id="labels-layer" class="fixed inset-0 pointer-events-none overflow-hidden z-10"></div>
+
+  <!-- Scale Transition Flash -->
+  <div id="transition-flash" class="fixed inset-0 pointer-events-none z-15 opacity-0 transition-opacity duration-300"
+    style="background: radial-gradient(circle at center, rgba(125,211,252,0.22), rgba(1,2,10,0.88))"></div>
+
+  <!-- Top HUD -->
+  <header id="hud-top" class="fixed top-3 left-3 right-3 z-30 flex items-start justify-between gap-2 pointer-events-none"></header>
+
+  <!-- Left Controls Drawer -->
+  <aside id="controls-drawer" class="glass-panel fixed top-28 left-3 z-20 w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-200px)] overflow-y-auto custom-scroll rounded-2xl p-4 hidden"></aside>
+
+  <!-- Right Info Panel -->
+  <aside id="info-panel" class="glass-panel fixed top-28 right-3 z-20 w-80 max-w-[calc(100vw-24px)] max-h-[calc(100vh-200px)] overflow-y-auto custom-scroll rounded-2xl p-4"></aside>
+
+  <!-- Cosmic Timeline (Bottom Left) -->
+  <div id="timeline-panel" class="glass-panel fixed bottom-16 left-3 z-25 w-80 max-w-[calc(100vw-24px)] rounded-2xl p-3.5 hidden"></div>
+
+  <!-- Minimap Radar (Bottom Right) -->
+  <canvas id="minimap-canvas" class="glass-panel fixed bottom-16 right-3 z-25 w-40 h-40 rounded-2xl hidden"></canvas>
+
+  <!-- Bottom Navigation Bar -->
+  <nav id="nav-bar" class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100vw-16px)]"></nav>
+
+  <!-- Continuous Zoom Control (Right Center) -->
+  <div id="zoom-control" class="fixed right-3 top-1/2 -translate-y-1/2 z-30 hidden sm:flex"></div>
+
+  <!-- Search Overlay -->
+  <div id="search-overlay" class="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel w-full max-w-lg rounded-2xl p-4">
+      <input id="search-input" type="text" placeholder="মহাবিশ্বে খুঁজুন... (পৃথিবী, শনি, আকাশগঙ্গা, প্রক্সিমা)"
+        class="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-sky-400/70" />
+      <div id="search-results" class="mt-3 max-h-72 overflow-y-auto custom-scroll space-y-1"></div>
+    </div>
+  </div>
+
+  <!-- Help & Shortcuts Overlay -->
+  <div id="help-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden"></div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+  <!-- WebGL Fallback -->
+  <div id="webgl-fallback" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/95">
+    <div class="glass-panel max-w-md rounded-2xl p-6 text-center">
+      <h2 class="text-xl font-bold text-sky-200 mb-2">৩ডি গ্রাফিক্স চালু করা যায়নি</h2>
+      <p class="text-sm text-slate-300">আপনার ব্রাউজারে WebGL2 সমর্থন পাওয়া যায়নি। আধুনিক ব্রাউজারে হার্ডওয়্যার অ্যাক্সিলারেশন চালু করে আবার চেষ্টা করুন।</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
