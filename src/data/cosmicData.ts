@@ -84,6 +84,150 @@ export const MOON_SIDEREAL_DAYS = 27.321661;
 export const MOON_INCLINATION = (5.145 * Math.PI) / 180;
 
 /**
+ * Moon catalog for every planet with known major satellites (NASA / JPL).
+ *
+ * Physical truth preserved:
+ *  - `periodDays` is the real sidereal orbital period (drives the motion
+ *    from the unified clock — Phobos's 7.6-hour orbit, faster than Mars's
+ *    own rotation, actually works here).
+ *  - Regular satellites (`equatorial: true`) orbit in the planet's
+ *    equatorial plane — Uranus's moons therefore swing perpendicular to
+ *    the ecliptic, exactly as in reality. Earth's Moon and the captured
+ *    retrograde Triton orbit nearer the ecliptic / an inclined plane.
+ *  - `retrograde: true` makes the orbit run backward (Triton).
+ *  - Tidal locking is inherent to the pivot construction: every moon keeps
+ *    the same face toward its planet.
+ *
+ * Visual compromises (documented, as everywhere in the app): sizes and
+ * distances are compressed so each satellite stays visible and inside its
+ * planet's local neighbourhood; real systems span 60–260 planet radii.
+ */
+export interface MoonData {
+  id: string;
+  name: string;
+  nameBn: string;
+  /** Visual radius as a fraction of the host planet's radius. */
+  radiusRatio: number;
+  /** Visual orbital distance in host-planet radii (compressed from real). */
+  distanceVR: number;
+  /** Real sidereal orbital period in Earth days. */
+  periodDays: number;
+  /** Retrograde orbit (e.g. Triton). */
+  retrograde?: boolean;
+  /** Orbit in the planet's equatorial plane (regular satellites). */
+  equatorial?: boolean;
+  /** Orbital inclination to the reference plane, radians. */
+  inclination?: number;
+  /** Surface tint. */
+  color?: string;
+}
+
+export const PLANET_MOONS: Record<string, MoonData[]> = {
+  earth: [
+    {
+      id: 'moon', name: 'Moon', nameBn: 'চাঁদ',
+      radiusRatio: 0.27, distanceVR: 2.6,
+      periodDays: 27.321661, inclination: MOON_INCLINATION,
+      color: '#c8c4bc',
+    },
+  ],
+  mars: [
+    {
+      id: 'phobos', name: 'Phobos', nameBn: 'ফোবোস',
+      radiusRatio: 0.055, distanceVR: 2.3,
+      periodDays: 0.3189, equatorial: true,
+      color: '#8f857a',
+    },
+    {
+      id: 'deimos', name: 'Deimos', nameBn: 'ডিমোস',
+      radiusRatio: 0.04, distanceVR: 3.4,
+      periodDays: 1.26244, equatorial: true,
+      color: '#a3988a',
+    },
+  ],
+  jupiter: [
+    {
+      id: 'io', name: 'Io', nameBn: 'আইও',
+      radiusRatio: 0.09, distanceVR: 2.6,
+      periodDays: 1.769138, equatorial: true,
+      color: '#e0be6a',
+    },
+    {
+      id: 'europa', name: 'Europa', nameBn: 'ইউরোপা',
+      radiusRatio: 0.08, distanceVR: 3.3,
+      periodDays: 3.551181, equatorial: true,
+      color: '#cfc9bd',
+    },
+    {
+      id: 'ganymede', name: 'Ganymede', nameBn: 'গ্যানিমিড',
+      radiusRatio: 0.125, distanceVR: 4.3,
+      periodDays: 7.15455, equatorial: true,
+      color: '#9b9284',
+    },
+    {
+      id: 'callisto', name: 'Callisto', nameBn: 'ক্যালিস্টো',
+      radiusRatio: 0.11, distanceVR: 5.6,
+      periodDays: 16.6890174, equatorial: true,
+      color: '#6f675c',
+    },
+  ],
+  saturn: [
+    {
+      id: 'enceladus', name: 'Enceladus', nameBn: 'এনসেলাডাস',
+      radiusRatio: 0.05, distanceVR: 3.0,
+      periodDays: 1.370218, equatorial: true,
+      color: '#e6eef2',
+    },
+    {
+      id: 'rhea', name: 'Rhea', nameBn: 'রিয়া',
+      radiusRatio: 0.07, distanceVR: 3.7,
+      periodDays: 4.518212, equatorial: true,
+      color: '#b5aea2',
+    },
+    {
+      id: 'titan', name: 'Titan', nameBn: 'টাইটান',
+      radiusRatio: 0.105, distanceVR: 4.9,
+      periodDays: 15.945421, equatorial: true,
+      color: '#d9a441',
+    },
+    {
+      id: 'iapetus', name: 'Iapetus', nameBn: 'ইয়াপেটাস',
+      radiusRatio: 0.06, distanceVR: 6.1,
+      periodDays: 79.3215, equatorial: true,
+      color: '#8a7f6d',
+    },
+  ],
+  uranus: [
+    {
+      id: 'miranda', name: 'Miranda', nameBn: 'মিরান্ডা',
+      radiusRatio: 0.05, distanceVR: 2.4,
+      periodDays: 1.413479, equatorial: true,
+      color: '#9aa4a4',
+    },
+    {
+      id: 'titania', name: 'Titania', nameBn: 'টাইটানিয়া',
+      radiusRatio: 0.085, distanceVR: 3.4,
+      periodDays: 8.705872, equatorial: true,
+      color: '#8f8a80',
+    },
+    {
+      id: 'oberon', name: 'Oberon', nameBn: 'ওবেরন',
+      radiusRatio: 0.08, distanceVR: 4.4,
+      periodDays: 13.463239, equatorial: true,
+      color: '#7d786e',
+    },
+  ],
+  neptune: [
+    {
+      id: 'triton', name: 'Triton', nameBn: 'ট্রাইটন (পশ্চাৎগামী)',
+      radiusRatio: 0.095, distanceVR: 3.2,
+      periodDays: 5.876854, retrograde: true, inclination: 0.4,
+      color: '#c9bdb0',
+    },
+  ],
+};
+
+/**
  * Simulation clock: at time-scale 1×, one real second equals one Earth day.
  * Every motion in the star-system layers (orbits, spins, moons, sun,
  * asteroid belt) is driven from this one clock using real periods, so

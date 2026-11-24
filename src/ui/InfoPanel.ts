@@ -5,7 +5,7 @@
 import { AppState, ScaleLevel, StatItem } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
-import { SUPERCLUSTERS, GALAXIES, STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
+import { SUPERCLUSTERS, GALAXIES, STAR_SYSTEMS_CATALOG, PLANET_MOONS, MoonData } from '../data/cosmicData';
 import { toBn } from '../utils/math';
 
 export class InfoPanel {
@@ -30,6 +30,8 @@ export class InfoPanel {
     let stats: StatItem[] = [];
     let listTitle = '';
     let listItems: Array<{ label: string; color: string; onClick: () => void }> = [];
+    let godsEye: { host: string; planetId: string; color: string } | null = null;
+    let moonList: MoonData[] = [];
     let sourceName = 'NASA Astrophysics';
     let sourceUrl = 'https://science.nasa.gov/universe/';
 
@@ -192,6 +194,8 @@ export class InfoPanel {
         stats = p.stats;
         sourceName = p.sourceName;
         sourceUrl = p.sourceUrl;
+        godsEye = { host: sys.id, planetId: p.id, color: p.color };
+        moonList = PLANET_MOONS[p.id] ?? [];
         listTitle = `${sys.nameBn}-এর অন্যান্য গ্রহ`;
         listItems = sys.planets.map((pl) => ({
           label: pl.nameBn,
@@ -201,6 +205,38 @@ export class InfoPanel {
         break;
       }
     }
+
+    const godsEyeHtml = godsEye
+      ? `
+        <button type="button" id="btn-gods-eye"
+          class="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold
+                 bg-gradient-to-r from-emerald-500/30 to-sky-500/30 border border-emerald-400/40 text-emerald-50
+                 hover:from-emerald-500/45 hover:to-sky-500/45 transition">
+          <span>👁</span><span>গড'স আই ভিউ — সম্পূর্ণ আলোকিত গ্রহ</span>
+        </button>`
+      : '';
+
+    const moonsHtml =
+      moonList.length > 0
+        ? `
+        <div class="mt-3 pt-3 border-t border-white/10">
+          <div class="text-[11px] font-semibold text-sky-300 mb-2">উপগ্রহসমূহ (${toBn(moonList.length)})</div>
+          <div class="space-y-1">
+            ${moonList
+              .map(
+                (m) => `
+              <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/5 text-xs text-slate-200">
+                <span class="w-2 h-2 rounded-full shrink-0" style="background:${m.color || '#c8c4bc'}; box-shadow:0 0 6px ${m.color || '#c8c4bc'}"></span>
+                <span class="truncate">${m.nameBn} <span class="text-slate-500">(${m.name})</span></span>
+                <span class="ml-auto text-[10px] text-slate-400 shrink-0">${
+                  m.retrograde ? 'পশ্চাৎগামী • ' : ''
+                }${toBn(m.periodDays < 10 ? m.periodDays.toFixed(2) : m.periodDays.toFixed(1))} দিন</span>
+              </div>`
+              )
+              .join('')}
+          </div>
+        </div>`
+        : '';
 
     const statsHtml = stats
       .map(
@@ -240,7 +276,11 @@ export class InfoPanel {
 
       <p class="mt-3 text-xs text-slate-300 leading-relaxed">${desc}</p>
 
+      ${godsEyeHtml}
+
       <div class="mt-3 grid grid-cols-2 gap-1.5">${statsHtml}</div>
+
+      ${moonsHtml}
 
       ${
         listItems.length > 0
@@ -265,6 +305,12 @@ export class InfoPanel {
     this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
       this.state.showInfo = false;
       this.container.classList.add('hidden');
+    });
+
+    this.container.querySelector('#btn-gods-eye')?.addEventListener('click', () => {
+      if (godsEye) {
+        this.sceneManager.flyToGodsEye(godsEye.host, godsEye.planetId);
+      }
     });
 
     this.container.querySelectorAll('.info-list-btn').forEach((btn) => {

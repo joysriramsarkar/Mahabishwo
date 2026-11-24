@@ -12,8 +12,8 @@ import {
   ORBIT_ECCENTRICITY,
   ROTATION_PERIOD_DAYS,
   SUN_ROTATION_DAYS,
-  MOON_SIDEREAL_DAYS,
-  MOON_INCLINATION,
+  PLANET_MOONS,
+  MoonData,
   SIM_DAYS_PER_SECOND,
 } from '../../data/cosmicData';
 import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from '../../render/shaders';
@@ -33,6 +33,12 @@ import {
 } from '../helpers';
 import { mulberry32, gaussianRandom } from '../../utils/math';
 
+/** One live satellite: rides its pivot, tidally locked, at its real rate. */
+export interface ActiveMoon {
+  pivot: THREE.Group;
+  data: MoonData;
+}
+
 export interface ActivePlanetItem {
   data: PlanetData;
   group: THREE.Group;
@@ -40,7 +46,7 @@ export interface ActivePlanetItem {
   tiltGroup: THREE.Group;
   mesh: THREE.Mesh;
   cloudsMesh: THREE.Mesh | null;
-  moonPivot: THREE.Group | null;
+  moons: ActiveMoon[];
   orbitMaterial: THREE.ShaderMaterial;
   /** Mean anomaly (advances uniformly — Kepler's second law gives variable orbital speed). */
   angle: number;
@@ -69,10 +75,50 @@ function solveEccentricAnomaly(M: number, e: number): number {
 }
 
 const TWO_PI = Math.PI * 2;
-/** Mean motion of the Moon around its planet: rad per simulated day. */
-const MOON_MEAN_MOTION = TWO_PI / MOON_SIDEREAL_DAYS;
 /** Sun's spin rate: rad per simulated day. */
 const SUN_SPIN_RATE = TWO_PI / SUN_ROTATION_DAYS;
+
+/**
+ * Build one satellite system: each moon rides a pivot so it is tidally
+ * locked (same hemisphere planetward), orbits prograde at its real period
+ * (retrograde when the catalog says so), and sits in the correct plane —
+ * the planet's equator for regular satellites, an inclined/ecliptic plane
+ * for Earth's Moon and captured Triton.
+ */
+function buildMoonSystem(
+  planetId: string,
+  systemId: string,
+  planetRadius: number,
+  tiltGroup: THREE.Group,
+  planetGroup: THREE.Group,
+  moons: MoonData[]
+): ActiveMoon[] {
+  const active: ActiveMoon[] = [];
+  moons.forEach((m) => {
+    const pivot = new THREE.Group();
+    (m.equatorial ? tiltGroup : planetGroup).add(pivot);
+    pivot.rotation.z = m.inclination ?? 0;
+
+    const tex = TextureFactory.getPlanetTextures('moon', 256, 128);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex.map,
+      bumpMap: tex.bumpMap ?? null,
+      bumpScale: 0.03,
+      roughness: 0.95,
+      color: m.color ?? '#c8c4bc',
+    });
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(planetRadius * m.radiusRatio, 32, 32),
+      mat
+    );
+    mesh.position.set(planetRadius * m.distanceVR, 0, 0);
+    // Tapping a satellite flies you to its host planet.
+    mesh.userData = { pickType: 'planet', planetId, systemId };
+    pivot.add(mesh);
+    active.push({ pivot, data: m });
+  });
+  return active;
+}
 
 export class StarSystemLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -345,29 +391,20 @@ export class StarSystemLayer implements SceneLayer {
         planetGroup.add(atmo.mesh);
       }
 
-      // Moon — orbits in a plane inclined ~5.1° to the ecliptic (not the
-      // equator), prograde, with a real 27.32-day sidereal period. Being
-      // fixed on the rotating pivot it is automatically tidally locked:
-      // the same hemisphere always faces the planet.
-      let moonPivot: THREE.Group | null = null;
-      if (pData.hasMoon) {
-        moonPivot = new THREE.Group();
-        moonPivot.rotation.z = MOON_INCLINATION;
-        planetGroup.add(moonPivot);
-        const moonTex = TextureFactory.getPlanetTextures('moon', 512, 256);
-        const moonMat = new THREE.MeshStandardMaterial({
-          map: moonTex.map,
-          bumpMap: moonTex.bumpMap ?? null,
-          bumpScale: 0.03,
-          roughness: 0.92,
-        });
-        RealTextures.applyToMaterial('moon', moonMat);
-        const moonMesh = new THREE.Mesh(
-          new THREE.SphereGeometry(pData.radius * 0.27, 32, 32),
-          moonMat
-        );
-        moonMesh.position.set(pData.radius * 2.6, 0, 0);
-        moonPivot.add(moonMesh);
+      // Satellite system — every catalogued moon at its real period, in the
+      // correct plane, tidally locked (see buildMoonSystem for the physics).
+      const moons = buildMoonSystem(
+        pData.id,
+        systemId,
+        pData.radius,
+        tiltGroup,
+        planetGroup,
+        PLANET_MOONS[pData.id] ?? []
+      );
+      // Earth's Moon gets the real photographic surface upgrade.
+      if (pData.id === 'earth' && moons.length > 0) {
+        const moonMesh = moons[0].pivot.children[0] as THREE.Mesh;
+        RealTextures.applyToMaterial('moon', moonMesh.material as THREE.MeshStandardMaterial);
       }
 
       // Rings lie in the planet's equatorial plane — inside the tilted frame.
@@ -392,7 +429,7 @@ export class StarSystemLayer implements SceneLayer {
         tiltGroup,
         mesh: pMesh,
         cloudsMesh,
-        moonPivot,
+        moons,
         orbitMaterial: orbitLine.material as THREE.ShaderMaterial,
         angle: startM,
         // Mean motion: rad per simulated day, from the real orbital period.
@@ -406,6 +443,12 @@ export class StarSystemLayer implements SceneLayer {
 
   public getPickTargets(): THREE.Object3D[] {
     const targets: THREE.Object3D[] = this.planets.map((p) => p.mesh);
+    this.planets.forEach((p) => {
+      p.moons.forEach((m) => {
+        const mesh = m.pivot.children[0];
+        if (mesh) targets.push(mesh);
+      });
+    });
     if (this.starMesh) targets.push(this.starMesh);
     return targets;
   }
@@ -475,10 +518,11 @@ export class StarSystemLayer implements SceneLayer {
           // Clouds ride the spin plus a gentle zonal drift.
           p.cloudsMesh.rotation.y += dtDays * p.spinSpeed * 1.12;
         }
-        if (p.moonPivot) {
-          // Moon: real 27.32-day sidereal period, prograde, tidally locked.
-          p.moonPivot.rotation.y += dtDays * MOON_MEAN_MOTION;
-        }
+        // Satellites: real periods, retrograde for Triton, tidal lock inherent.
+        p.moons.forEach((m) => {
+          const rate = TWO_PI / m.data.periodDays;
+          m.pivot.rotation.y += dtDays * (m.data.retrograde ? -rate : rate);
+        });
         p.orbitMaterial.uniforms.uHeadAngle.value = E;
       }
     });

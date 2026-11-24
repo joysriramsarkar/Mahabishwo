@@ -20,12 +20,48 @@ import {
 } from '../helpers';
 import {
   ROTATION_PERIOD_DAYS,
-  MOON_SIDEREAL_DAYS,
-  MOON_INCLINATION,
+  PLANET_MOONS,
+  MoonData,
   SIM_DAYS_PER_SECOND,
 } from '../../data/cosmicData';
 
 const TWO_PI = Math.PI * 2;
+
+interface ActiveMoon {
+  pivot: THREE.Group;
+  data: MoonData;
+}
+
+/**
+ * Satellite system at close-up: same catalog, same real periods, tidally
+ * locked on their pivots, regular moons in the planet's equatorial plane.
+ */
+function buildMoonSystem(
+  R: number,
+  tiltGroup: THREE.Group,
+  hostGroup: THREE.Group,
+  moons: MoonData[]
+): ActiveMoon[] {
+  const active: ActiveMoon[] = [];
+  moons.forEach((m) => {
+    const pivot = new THREE.Group();
+    (m.equatorial ? tiltGroup : hostGroup).add(pivot);
+    pivot.rotation.z = m.inclination ?? 0;
+    const moonTex = TextureFactory.getPlanetTextures('moon', 512, 256);
+    const moonMat = new THREE.MeshStandardMaterial({
+      map: moonTex.map,
+      bumpMap: moonTex.bumpMap ?? null,
+      bumpScale: 0.06,
+      roughness: 0.94,
+      color: m.color ?? '#c8c4bc',
+    });
+    const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(R * m.radiusRatio, 48, 48), moonMat);
+    moonMesh.position.set(R * m.distanceVR, 0, 0);
+    pivot.add(moonMesh);
+    active.push({ pivot, data: m });
+  });
+  return active;
+}
 
 export class PlanetLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -34,8 +70,7 @@ export class PlanetLayer implements SceneLayer {
   public activePlanet: PlanetData | null = null;
   private planetMesh: THREE.Mesh | null = null;
   private cloudsMesh: THREE.Mesh | null = null;
-  private moonMesh: THREE.Mesh | null = null;
-  private moonPivot: THREE.Group | null = null;
+  private moons: ActiveMoon[] = [];
 
   constructor() {}
 
@@ -49,8 +84,7 @@ export class PlanetLayer implements SceneLayer {
     this.group.clear();
     this.planetMesh = null;
     this.cloudsMesh = null;
-    this.moonMesh = null;
-    this.moonPivot = null;
+    this.moons = [];
 
     if (!this.activePlanet) return;
     const p = this.activePlanet;
@@ -136,24 +170,19 @@ export class PlanetLayer implements SceneLayer {
       this.group.add(outerAtmo.mesh);
     }
 
-    // 4. Orbiting moon — 27.32-day prograde orbit inclined ~5.1° to the
-    // ecliptic. Fixed on the rotating pivot, it is automatically tidally
-    // locked: the same hemisphere always faces the planet.
-    if (p.hasMoon) {
-      this.moonPivot = new THREE.Group();
-      this.moonPivot.rotation.z = MOON_INCLINATION;
-      this.group.add(this.moonPivot);
-      const moonTex = TextureFactory.getPlanetTextures('moon', 1024, 512);
-      const moonMat = new THREE.MeshStandardMaterial({
-        map: moonTex.map,
-        bumpMap: moonTex.bumpMap ?? null,
-        bumpScale: 0.06,
-        roughness: 0.94,
-      });
-      RealTextures.applyToMaterial('moon', moonMat);
-      this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 0.27, 48, 48), moonMat);
-      this.moonMesh.position.set(R * 2.8, 0, 0);
-      this.moonPivot.add(this.moonMesh);
+    // 4. Satellite system — real periods from the unified clock; regular
+    // moons orbit the planet's equator (so Uranus's family swings nearly
+    // perpendicular to the ecliptic), Earth's Moon rides an inclined
+    // ecliptic-plane orbit, Triton runs retrograde. All are tidally locked.
+    this.moons = buildMoonSystem(
+      R,
+      tiltGroup,
+      this.group,
+      PLANET_MOONS[p.id] ?? []
+    );
+    if (p.id === 'earth' && this.moons.length > 0) {
+      const moonMesh = this.moons[0].pivot.children[0] as THREE.Mesh;
+      RealTextures.applyToMaterial('moon', moonMesh.material as THREE.MeshStandardMaterial);
     }
 
     // 5. Rings (HD) — in the planet's true equatorial plane (tilted frame)
@@ -185,9 +214,10 @@ export class PlanetLayer implements SceneLayer {
       if (this.cloudsMesh) {
         this.cloudsMesh.rotation.y += dtDays * spinRate * 1.12;
       }
-      if (this.moonPivot && this.moonMesh) {
-        this.moonPivot.rotation.y += dtDays * (TWO_PI / MOON_SIDEREAL_DAYS);
-      }
+      this.moons.forEach((m) => {
+        const rate = TWO_PI / m.data.periodDays;
+        m.pivot.rotation.y += dtDays * (m.data.retrograde ? -rate : rate);
+      });
     }
   }
 

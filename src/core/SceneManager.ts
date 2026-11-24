@@ -621,6 +621,38 @@ export class SceneManager {
     }
   }
 
+  /**
+   * God's Eye view — the whole planet as one fully-lit disk.
+   * The camera is placed on the sunward side of the planet (between it and
+   * its star, slightly above the orbital plane), so you see the complete
+   * illuminated hemisphere like the classic "blue marble" portrait, with
+   * the satellite system around it. Tracking keeps the view glued to the
+   * planet as it continues its Kepler orbit.
+   */
+  public flyToGodsEye(systemId: string, planetId: string, duration = 1.6): void {
+    this.transitionToScale(ScaleLevel.PLANET, { systemId, planetId });
+    if (!this.cameraCtrl) return;
+    const item = this.starSystem.planets.find((p) => p.data.id === planetId);
+    if (!item) return;
+    const pos = new THREE.Vector3();
+    item.group.getWorldPosition(pos);
+    // Camera between the planet and its star sees the full lit face.
+    const sunwardTheta = Math.atan2(pos.x, pos.z) + Math.PI;
+    // Ringed worlds need a step back so the full ring span fits the frame.
+    const targetRadius = item.data.hasRings || item.data.hasThinRing ? 14.0 : 11.0;
+    this.cameraCtrl.animateTo(
+      sunwardTheta,
+      1.32,
+      targetRadius,
+      pos,
+      duration,
+      () => {
+        this.cameraCtrl?.trackObject(item.group, false);
+      },
+      item.group
+    );
+  }
+
   /** Raycast tap against interactive objects in the current scale. */
   public pickAt(
     clientX: number,

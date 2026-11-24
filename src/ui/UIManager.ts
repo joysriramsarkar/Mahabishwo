@@ -93,6 +93,7 @@ export class UIManager {
       { id: 'sep', label: '' },
       { id: 'solar', label: '☀️ সৌরজগৎ', cls: 'text-amber-200 hover:bg-amber-500/20 font-semibold' },
       { id: 'earth', label: '🌍 পৃথিবী (HD)', cls: 'text-emerald-200 hover:bg-emerald-500/20 font-semibold' },
+      { id: 'earth-gods-eye', label: "👁 গড'স আই ভিউ", cls: 'text-emerald-100 hover:bg-emerald-500/25 font-semibold' },
       { id: 'proxima', label: '🔴 প্রক্সিমা b', cls: 'text-rose-200 hover:bg-rose-500/20' },
       { id: 'trappist', label: '🪐 ট্র্যাপিস্ট-১', cls: 'text-purple-200 hover:bg-purple-500/20' },
       { id: 'kepler186', label: '💠 কেপলার-১৮৬f', cls: 'text-cyan-200 hover:bg-cyan-500/20' },
@@ -157,6 +158,10 @@ export class UIManager {
       }
       case 'earth':
         this.sceneManager.flyToPlanet('solar', 'earth');
+        break;
+      case 'earth-gods-eye':
+        this.sceneManager.flyToGodsEye('solar', 'earth');
+        Toasts.show("👁 গড'স আই — সম্পূর্ণ আলোকিত পৃথিবী", 2600);
         break;
       case 'proxima':
         this.sceneManager.flyToPlanet('proxima', 'proxima_b');
@@ -252,7 +257,9 @@ export class UIManager {
       [ScaleLevel.STAR_SYSTEM]: this.state.activeSystemId === 'trappist' ? 'trappist' : 'solar',
     };
     if (to === ScaleLevel.PLANET || to === ScaleLevel.SURFACE) {
-      if (this.state.activePlanetId === 'earth') this.setActivePill('earth');
+      if (this.state.activePreset === 'earth-gods-eye' && this.state.activePlanetId === 'earth') {
+        this.setActivePill('earth-gods-eye');
+      } else if (this.state.activePlanetId === 'earth') this.setActivePill('earth');
       else if (this.state.activePlanetId === 'proxima_b') this.setActivePill('proxima');
       else if (this.state.activePlanetId === 'k_f') this.setActivePill('kepler186');
     } else if (presetByScale[to]) {
