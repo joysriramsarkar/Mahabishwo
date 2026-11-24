@@ -26,6 +26,7 @@ export class Engine {
       antialias: false, // MSAA handled by the composer
       alpha: false,
       logarithmicDepthBuffer: true,
+      preserveDrawingBuffer: true,
       powerPreference: 'high-performance',
       stencil: false,
     });

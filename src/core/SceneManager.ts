@@ -75,7 +75,6 @@ export class SceneManager {
   private reportedScale: ScaleLevel = ScaleLevel.OBSERVABLE_UNIVERSE;
   private lightingScale: ScaleLevel = ScaleLevel.OBSERVABLE_UNIVERSE;
   private prevZoomT = 0;
-  private prevGalaxyAnchorQ = 0;
   private enteredLocalGroup = false;
   private enteredMilkyWay = false;
   private enteredStarSystem = false;
@@ -236,7 +235,6 @@ export class SceneManager {
       if (t < 2.05) this.enteredMilkyWay = false;
       if (t < 3.05) {
         this.enteredStarSystem = false;
-        this.prevGalaxyAnchorQ = 0;
       }
       if (t < 4.12) {
         if (this.enteredPlanet) this.cameraCtrl?.releaseTracking();
@@ -308,17 +306,9 @@ export class SceneManager {
       : 6;
     const tEff = Math.min(t, effectiveMaxScale);
 
-    // Lockstep recentering when manually zooming between Milky Way (Orion Spur) and Star System
-    if (this.enteredStarSystem && !isTransitioning && target) {
-      const qGal = tEff >= 3 && tEff <= 3.85 ? smooth((tEff - 3) / 0.85) : tEff > 3.85 ? 1 : 0;
-      const dq = qGal - this.prevGalaxyAnchorQ;
-      if (Math.abs(dq) > 1e-5) {
-        this.getChildAnchor(3, this.anchorTmp);
-        target.addScaledVector(this.anchorTmp, -dq);
-        this.cameraCtrl?.coords.target.addScaledVector(this.anchorTmp, -dq);
-      }
-      this.prevGalaxyAnchorQ = qGal;
-    }
+    // StarSystemLayer stays at world origin, so no galactic-anchor recentering is
+    // needed here (shifting the target by SOLAR_GALACTIC_POS would move the camera
+    // away from the host star and leave the system looking empty).
 
     // Dynamic camera floor: prevent clipping into planets, host star, or Sgr A*
     let minR = 2.0;
@@ -595,7 +585,6 @@ export class SceneManager {
     this.enteredMilkyWay = newScale >= ScaleLevel.GALAXY;
     this.enteredStarSystem = newScale >= ScaleLevel.STAR_SYSTEM;
     this.enteredPlanet = newScale >= ScaleLevel.PLANET;
-    this.prevGalaxyAnchorQ = this.enteredStarSystem ? 1 : 0;
     if (!this.enteredPlanet) {
       this.cameraCtrl?.releaseTracking();
     }

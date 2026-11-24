@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
-import { STAR_SYSTEMS_CATALOG } from '../../data/cosmicData';
+import { STAR_SYSTEMS_CATALOG, ORBIT_PERIOD_DAYS } from '../../data/cosmicData';
 import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
@@ -32,7 +32,12 @@ export interface ActivePlanetItem {
   moonPivot: THREE.Group | null;
   orbitMaterial: THREE.ShaderMaterial;
   angle: number;
+  /** Physically-derived angular velocity (rad/s) from the real orbital period. */
+  angularSpeed: number;
 }
+
+/** Visual seconds for one orbit of the fastest planet in each system. */
+const VISUAL_ORBIT_SECONDS = 24;
 
 export class StarSystemLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -79,6 +84,13 @@ export class StarSystemLayer implements SceneLayer {
     this.activeSystemId = systemId;
     const sys = STAR_SYSTEMS_CATALOG[systemId] || STAR_SYSTEMS_CATALOG.solar;
     const rand = mulberry32(8822 + systemId.length * 91);
+
+    // Physically-correct relative speeds: angular velocity ∝ 1 / real orbital period.
+    // Normalise the innermost (fastest) world to a watchable VISUAL_ORBIT_SECONDS.
+    const periods = sys.planets.map(
+      (p) => ORBIT_PERIOD_DAYS[p.id] ?? 365.25 * Math.pow(p.orbitRadius / 19.8, 1.5)
+    );
+    const referencePeriod = periods.length ? Math.min(...periods) : 365.25;
 
     // 1. Host Star — procedural photosphere shader
     const isRed = sys.star.textureType === 'sun_red';
@@ -328,6 +340,8 @@ export class StarSystemLayer implements SceneLayer {
         moonPivot,
         orbitMaterial: orbitLine.material as THREE.ShaderMaterial,
         angle: startAngle,
+        angularSpeed:
+          ((Math.PI * 2) / VISUAL_ORBIT_SECONDS) * (referencePeriod / periods[idx]),
       });
     });
   }
@@ -377,18 +391,21 @@ export class StarSystemLayer implements SceneLayer {
 
     this.planets.forEach((p) => {
       if (state.isPlaying && state.rotationSpeed > 0) {
-        p.angle += dt * p.data.speed * 0.38 * state.rotationSpeed;
+        p.angle += dt * p.angularSpeed * state.rotationSpeed;
         p.group.position.set(
           Math.cos(p.angle) * p.data.orbitRadius,
           0,
           Math.sin(p.angle) * p.data.orbitRadius
         );
-        p.mesh.rotation.y += dt * p.data.rotSpeed * state.rotationSpeed;
+        // Axial spin and cloud drift are deliberately gentle — real rotation
+        // would be a blur at this scale; keep them well below orbital motion.
+        p.mesh.rotation.y += dt * p.data.rotSpeed * 0.22 * state.rotationSpeed;
         if (p.cloudsMesh) {
-          p.cloudsMesh.rotation.y += dt * p.data.rotSpeed * 1.24 * state.rotationSpeed;
+          p.cloudsMesh.rotation.y += dt * p.data.rotSpeed * 1.24 * 0.22 * state.rotationSpeed;
         }
         if (p.moonPivot) {
-          p.moonPivot.rotation.y += dt * 0.65 * state.rotationSpeed;
+          // Moon: ~27 days vs Earth's ~365 days, but softened for readability.
+          p.moonPivot.rotation.y += dt * 0.14 * state.rotationSpeed;
         }
         p.orbitMaterial.uniforms.uHeadAngle.value = p.angle;
       }

@@ -11,6 +11,27 @@ import {
   CosmicEra,
 } from '../core/types';
 
+/**
+ * Real orbital periods in Earth days (NASA / exoplanet catalogues).
+ * Used to derive physically-correct *relative* orbital speeds for every system.
+ */
+export const ORBIT_PERIOD_DAYS: Record<string, number> = {
+  mercury: 87.97,
+  venus: 224.7,
+  earth: 365.25,
+  mars: 686.98,
+  jupiter: 4332.6,
+  saturn: 10759,
+  uranus: 30687,
+  neptune: 60190,
+  proxima_d: 5.1,
+  proxima_b: 11.2,
+  t1_b: 1.51,
+  t1_e: 6.1,
+  t1_f: 9.2,
+  k_f: 129.9,
+};
+
 export const SUPERCLUSTERS: SuperclusterData[] = [
   {
     id: 'laniakea',
