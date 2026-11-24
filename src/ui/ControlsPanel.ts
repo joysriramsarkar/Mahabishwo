@@ -5,6 +5,27 @@
 import { AppState, DensityLevel, LayerVisibility, QualityLevel } from '../core/types';
 import { SceneManager } from '../core/SceneManager';
 import { toBn } from '../utils/math';
+import { SIM_DAYS_PER_SECOND } from '../data/cosmicData';
+
+/** Slider raw (0..50) → time scale. 0 stops time; 10 → 1×; every +10 → ×10. */
+function rawToSpeed(raw: number): number {
+  return raw <= 0.5 ? 0 : Math.pow(10, (raw - 10) / 10);
+}
+
+function speedToRaw(speed: number): number {
+  if (speed <= 0) return 0;
+  return Math.min(50, Math.max(1, 10 + 10 * Math.log10(speed)));
+}
+
+/** Bengali readout of the physical clock: what one real second equals. */
+function formatSimSpeed(speed: number): string {
+  if (speed <= 0) return 'সময় থামা';
+  const days = speed * SIM_DAYS_PER_SECOND;
+  if (days < 365) return `১ সে = ${toBn(days < 10 ? days.toFixed(1) : Math.round(days))} দিন`;
+  const years = days / 365.25;
+  if (years < 10) return `১ সে = ~${toBn(years.toFixed(1))} বছর`;
+  return `১ সে = ~${toBn(Math.round(years))} বছর`;
+}
 
 export class ControlsPanel {
   private container: HTMLElement;
@@ -67,10 +88,26 @@ export class ControlsPanel {
 
         <div>
           <div class="flex justify-between text-[11px] text-slate-300 mb-1">
-            <span>গতির মাত্রা</span>
-            <span id="ctrl-speed-val" class="font-semibold text-sky-200">${toBn(this.state.rotationSpeed.toFixed(1))}×</span>
+            <span>সময়ের গতি (ভৌত ঘড়ি)</span>
+            <span id="ctrl-speed-val" class="font-semibold text-sky-200">${formatSimSpeed(this.state.rotationSpeed)}</span>
           </div>
-          <input id="ctrl-speed" type="range" min="0" max="4" step="0.1" value="${this.state.rotationSpeed}" class="w-full h-1.5" />
+          <input id="ctrl-speed" type="range" min="0" max="50" step="0.5" value="${speedToRaw(this.state.rotationSpeed)}" class="w-full h-1.5" />
+          <div class="flex gap-1 mt-1.5">
+            ${[1, 10, 100, 1000, 10000]
+              .map(
+                (s) => `
+              <button type="button" data-speed="${s}"
+                class="speed-preset flex-1 py-0.5 rounded-lg text-[10px] border transition ${
+                  Math.abs(this.state.rotationSpeed - s) < 0.01
+                    ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }">
+                ${toBn(s)}×
+              </button>
+            `
+              )
+              .join('')}
+          </div>
         </div>
       </div>
 
@@ -161,9 +198,28 @@ export class ControlsPanel {
 
     const speedInput = this.container.querySelector('#ctrl-speed') as HTMLInputElement;
     const speedVal = this.container.querySelector('#ctrl-speed-val');
+    const syncSpeedUi = (speed: number) => {
+      if (speedVal) speedVal.textContent = formatSimSpeed(speed);
+      if (speedInput) speedInput.value = String(speedToRaw(speed));
+      this.container.querySelectorAll<HTMLButtonElement>('.speed-preset').forEach((btn) => {
+        const s = parseFloat(btn.dataset.speed || '0');
+        const active = Math.abs(speed - s) < 0.01;
+        btn.className = `speed-preset flex-1 py-0.5 rounded-lg text-[10px] border transition ${
+          active
+            ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
+            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+        }`;
+      });
+    };
     speedInput?.addEventListener('input', () => {
-      this.state.rotationSpeed = parseFloat(speedInput.value);
-      if (speedVal) speedVal.textContent = `${toBn(this.state.rotationSpeed.toFixed(1))}×`;
+      this.state.rotationSpeed = rawToSpeed(parseFloat(speedInput.value));
+      syncSpeedUi(this.state.rotationSpeed);
+    });
+    this.container.querySelectorAll<HTMLButtonElement>('.speed-preset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.state.rotationSpeed = parseFloat(btn.dataset.speed || '1');
+        syncSpeedUi(this.state.rotationSpeed);
+      });
     });
 
     const bloomInput = this.container.querySelector('#ctrl-bloom') as HTMLInputElement;

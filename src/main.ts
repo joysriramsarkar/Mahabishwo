@@ -158,7 +158,9 @@ async function boot(): Promise<void> {
     lastTime = now;
 
     if (state.isPlaying) {
-      state.elapsedTime += dt * state.rotationSpeed;
+      // Cosmetic shader time (sun churn, twinkles) stays pleasant even at
+      // extreme physics time-scales; the physical clock lives in the layers.
+      state.elapsedTime += dt * Math.min(state.rotationSpeed, 4);
     }
 
     cameraCtrl.update(dt);

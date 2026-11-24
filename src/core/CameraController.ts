@@ -94,7 +94,7 @@ export class CameraController {
     }
 
     if (this.state.autoRotate && !this.isTransitioning && this.state.isPlaying) {
-      this.coords.targetTheta += dt * 0.05 * this.state.rotationSpeed;
+      this.coords.targetTheta += dt * 0.05 * Math.min(this.state.rotationSpeed, 6);
     }
 
     // Collision-aware minimum (set by SceneManager, e.g. planet surface)

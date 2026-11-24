@@ -2,7 +2,9 @@
  * Scale 5 & 6: Planet Close-Up & Surface Inspection Layer.
  * High-resolution procedural planet sphere with bump & roughness maps,
  * emissive city lights, counter-rotating clouds, Rayleigh atmosphere rim,
- * orbiting moon and sunlit planetary rings.
+ * tidally-locked moon on a 27.3-day prograde orbit and sunlit rings lying
+ * in the planet's true equatorial plane. All motion is driven from the
+ * unified physical clock (1 s = 1 Earth day at time-scale 1×).
  */
 import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
@@ -16,6 +18,14 @@ import {
   updatePlanetCloudShadowMap,
   enableCloudNightFade,
 } from '../helpers';
+import {
+  ROTATION_PERIOD_DAYS,
+  MOON_SIDEREAL_DAYS,
+  MOON_INCLINATION,
+  SIM_DAYS_PER_SECOND,
+} from '../../data/cosmicData';
+
+const TWO_PI = Math.PI * 2;
 
 export class PlanetLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -25,12 +35,9 @@ export class PlanetLayer implements SceneLayer {
   private planetMesh: THREE.Mesh | null = null;
   private cloudsMesh: THREE.Mesh | null = null;
   private moonMesh: THREE.Mesh | null = null;
-  private moonGroup = new THREE.Group();
-  private moonAngle = 0;
+  private moonPivot: THREE.Group | null = null;
 
-  constructor() {
-    this.group.add(this.moonGroup);
-  }
+  constructor() {}
 
   public setPlanet(planet: PlanetData): void {
     this.activePlanet = planet;
@@ -40,17 +47,22 @@ export class PlanetLayer implements SceneLayer {
   public build(): void {
     disposeObject(this.group);
     this.group.clear();
-    this.moonGroup.clear();
     this.planetMesh = null;
     this.cloudsMesh = null;
     this.moonMesh = null;
-    this.group.add(this.moonGroup);
+    this.moonPivot = null;
 
     if (!this.activePlanet) return;
     const p = this.activePlanet;
     // Fixed visual radius for every world so zoom levels & surface
     // approach behave identically for Mercury and Jupiter alike.
     const R = 3.2;
+
+    // Axial tilt frame: the spin axis stays fixed in inertial space while
+    // the planet spins — the geometry that produces real seasons.
+    const tiltGroup = new THREE.Group();
+    tiltGroup.rotation.z = p.tilt || 0;
+    this.group.add(tiltGroup);
 
     // 1. Planet sphere
     const tex = TextureFactory.getPlanetTextures(p.textureType, 1536, 768);
@@ -72,8 +84,7 @@ export class PlanetLayer implements SceneLayer {
       emissiveIntensity: tex.nightMap ? 0.75 : 0,
     });
     this.planetMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 128), mat);
-    this.planetMesh.rotation.z = p.tilt || 0;
-    this.group.add(this.planetMesh);
+    tiltGroup.add(this.planetMesh);
     // Upgrade to the real photographic planetary map when downloaded
     RealTextures.applyToMaterial(p.textureType, mat);
 
@@ -87,8 +98,7 @@ export class PlanetLayer implements SceneLayer {
         depthWrite: false,
       });
       this.cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 1.018, 128, 128), cMat);
-      this.cloudsMesh.rotation.z = p.tilt || 0;
-      this.group.add(this.cloudsMesh);
+      tiltGroup.add(this.cloudsMesh);
       // Night-side clouds fade out instead of glowing gray from ambient light.
       enableCloudNightFade(cMat, this.cloudsMesh);
       if (p.textureType === 'earth') {
@@ -126,8 +136,13 @@ export class PlanetLayer implements SceneLayer {
       this.group.add(outerAtmo.mesh);
     }
 
-    // 4. Orbiting moon
+    // 4. Orbiting moon — 27.32-day prograde orbit inclined ~5.1° to the
+    // ecliptic. Fixed on the rotating pivot, it is automatically tidally
+    // locked: the same hemisphere always faces the planet.
     if (p.hasMoon) {
+      this.moonPivot = new THREE.Group();
+      this.moonPivot.rotation.z = MOON_INCLINATION;
+      this.group.add(this.moonPivot);
       const moonTex = TextureFactory.getPlanetTextures('moon', 1024, 512);
       const moonMat = new THREE.MeshStandardMaterial({
         map: moonTex.map,
@@ -138,10 +153,10 @@ export class PlanetLayer implements SceneLayer {
       RealTextures.applyToMaterial('moon', moonMat);
       this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 0.27, 48, 48), moonMat);
       this.moonMesh.position.set(R * 2.8, 0, 0);
-      this.moonGroup.add(this.moonMesh);
+      this.moonPivot.add(this.moonMesh);
     }
 
-    // 5. Rings (HD)
+    // 5. Rings (HD) — in the planet's true equatorial plane (tilted frame)
     if (p.hasRings || p.hasThinRing) {
       const inner = p.hasRings ? R * 1.35 : R * 1.45;
       const outer = p.hasRings ? R * 2.55 : R * 1.85;
@@ -153,8 +168,7 @@ export class PlanetLayer implements SceneLayer {
         TextureFactory.getRingTexture(p.hasRings ? 7 : 13, 1024, 16)
       );
       ring.mesh.rotation.x = Math.PI / 2;
-      ring.mesh.rotation.y = p.tilt || 0.42;
-      this.group.add(ring.mesh);
+      tiltGroup.add(ring.mesh);
       RealTextures.applyToRingMaterial(p.hasRings ? 'saturn' : 'uranus', ring.material);
     }
   }
@@ -162,17 +176,17 @@ export class PlanetLayer implements SceneLayer {
   public update(dt: number, state: AppState): void {
     if (!this.visible || !this.activePlanet) return;
     if (state.isPlaying && state.rotationSpeed > 0) {
+      const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
+      const spinRate = TWO_PI / (ROTATION_PERIOD_DAYS[this.activePlanet.id] ?? 1);
       if (this.planetMesh) {
-        this.planetMesh.rotation.y += dt * this.activePlanet.rotSpeed * 0.45 * state.rotationSpeed;
+        // Real sidereal spin: Venus barely turns, Jupiter races past you.
+        this.planetMesh.rotation.y += dtDays * spinRate;
       }
       if (this.cloudsMesh) {
-        this.cloudsMesh.rotation.y += dt * this.activePlanet.rotSpeed * 0.58 * state.rotationSpeed;
+        this.cloudsMesh.rotation.y += dtDays * spinRate * 1.12;
       }
-      if (this.moonMesh) {
-        this.moonAngle += dt * 0.32 * state.rotationSpeed;
-        const dist = 3.2 * 2.8;
-        this.moonMesh.position.set(Math.cos(this.moonAngle) * dist, 0, Math.sin(this.moonAngle) * dist);
-        this.moonMesh.rotation.y += dt * 0.16 * state.rotationSpeed;
+      if (this.moonPivot && this.moonMesh) {
+        this.moonPivot.rotation.y += dtDays * (TWO_PI / MOON_SIDEREAL_DAYS);
       }
     }
   }

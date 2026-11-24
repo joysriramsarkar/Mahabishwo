@@ -419,7 +419,10 @@ export class GalaxyLayer implements SceneLayer {
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
     if (state.isPlaying) {
-      this.group.rotation.y -= dt * 0.06 * state.rotationSpeed;
+      // Milky Way spins clockwise viewed from the north galactic pole (real).
+      // The whole-disk rate is a presentation cadence, capped so extreme
+      // time-scales (needed for Neptune) don't turn it into a blur.
+      this.group.rotation.y -= dt * 0.06 * Math.min(state.rotationSpeed, 6);
       const pulse = 1 + Math.sin(state.elapsedTime * 3.0) * 0.16;
       this.solarBeacon.scale.set(pulse, pulse, 1);
     }

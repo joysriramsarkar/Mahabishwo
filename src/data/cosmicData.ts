@@ -50,6 +50,47 @@ export const ORBIT_ECCENTRICITY: Record<string, number> = {
   k_f: 0.0,
 };
 
+/**
+ * Real sidereal rotation periods in Earth days (NASA / IAU).
+ * Retrograde worlds keep their retrograde nature in the axial tilt
+ * (Venus 177.4°, Uranus 97.8°), so all periods here are positive.
+ * Mercury's 58.65 d vs its 88 d year naturally produces the 3:2
+ * spin-orbit resonance. Close-in exoplanets are tidally locked,
+ * so their rotation period equals their orbital period (1:1).
+ */
+export const ROTATION_PERIOD_DAYS: Record<string, number> = {
+  mercury: 58.646,
+  venus: 243.018,
+  earth: 0.99726968,
+  mars: 1.02595676,
+  jupiter: 0.41354,
+  saturn: 0.44401,
+  uranus: 0.71833,
+  neptune: 0.67125,
+  // Tidally locked exoplanets — day length equals year length
+  proxima_d: 5.1,
+  proxima_b: 11.2,
+  t1_b: 1.51,
+  t1_e: 6.1,
+  t1_f: 9.2,
+  k_f: 129.9,
+};
+
+/** Sun's equatorial (Carrington) rotation period in days. */
+export const SUN_ROTATION_DAYS = 25.38;
+
+/** The Moon: sidereal orbital period and inclination to the ecliptic. */
+export const MOON_SIDEREAL_DAYS = 27.321661;
+export const MOON_INCLINATION = (5.145 * Math.PI) / 180;
+
+/**
+ * Simulation clock: at time-scale 1×, one real second equals one Earth day.
+ * Every motion in the star-system layers (orbits, spins, moons, sun,
+ * asteroid belt) is driven from this one clock using real periods, so
+ * all physical ratios are preserved exactly.
+ */
+export const SIM_DAYS_PER_SECOND = 1;
+
 export const SUPERCLUSTERS: SuperclusterData[] = [
   {
     id: 'laniakea',

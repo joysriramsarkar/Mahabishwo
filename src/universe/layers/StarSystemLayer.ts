@@ -6,7 +6,16 @@
  */
 import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
-import { STAR_SYSTEMS_CATALOG, ORBIT_PERIOD_DAYS, ORBIT_ECCENTRICITY } from '../../data/cosmicData';
+import {
+  STAR_SYSTEMS_CATALOG,
+  ORBIT_PERIOD_DAYS,
+  ORBIT_ECCENTRICITY,
+  ROTATION_PERIOD_DAYS,
+  SUN_ROTATION_DAYS,
+  MOON_SIDEREAL_DAYS,
+  MOON_INCLINATION,
+  SIM_DAYS_PER_SECOND,
+} from '../../data/cosmicData';
 import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
@@ -27,15 +36,27 @@ import { mulberry32, gaussianRandom } from '../../utils/math';
 export interface ActivePlanetItem {
   data: PlanetData;
   group: THREE.Group;
+  /** Carries the axial tilt so the spin axis stays fixed in inertial space (seasons). */
+  tiltGroup: THREE.Group;
   mesh: THREE.Mesh;
   cloudsMesh: THREE.Mesh | null;
   moonPivot: THREE.Group | null;
   orbitMaterial: THREE.ShaderMaterial;
   /** Mean anomaly (advances uniformly — Kepler's second law gives variable orbital speed). */
   angle: number;
-  /** Physically-derived angular velocity (rad/s) from the real orbital period. */
+  /** Mean motion in rad per simulated day: 2π / real orbital period. */
   angularSpeed: number;
+  /** Spin rate in rad per simulated day: 2π / real rotation period (sign: retrograde). */
+  spinSpeed: number;
   eccentricity: number;
+}
+
+/** One Keplerian asteroid-belt band: drawn as points, rotating at its own real rate. */
+interface BeltBand {
+  points: THREE.Points;
+  material: THREE.ShaderMaterial;
+  /** Angular velocity in rad per simulated day from Kepler's third law. */
+  rate: number;
 }
 
 /** Solve Kepler's equation M = E - e·sin(E) for the eccentric anomaly. */
@@ -47,8 +68,11 @@ function solveEccentricAnomaly(M: number, e: number): number {
   return E;
 }
 
-/** Visual seconds for one orbit of the fastest planet in each system. */
-const VISUAL_ORBIT_SECONDS = 24;
+const TWO_PI = Math.PI * 2;
+/** Mean motion of the Moon around its planet: rad per simulated day. */
+const MOON_MEAN_MOTION = TWO_PI / MOON_SIDEREAL_DAYS;
+/** Sun's spin rate: rad per simulated day. */
+const SUN_SPIN_RATE = TWO_PI / SUN_ROTATION_DAYS;
 
 export class StarSystemLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -67,8 +91,7 @@ export class StarSystemLayer implements SceneLayer {
   private prominenceMaterial: THREE.ShaderMaterial | null = null;
   private orbitLinesGroup = new THREE.Group();
   private hzMesh: THREE.Mesh | null = null;
-  private asteroidPoints: THREE.Points | null = null;
-  private asteroidMat: THREE.ShaderMaterial | null = null;
+  private beltBands: BeltBand[] = [];
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -88,20 +111,18 @@ export class StarSystemLayer implements SceneLayer {
     this.orbitLinesGroup.clear();
     this.planets = [];
     this.hzMesh = null;
-    this.asteroidPoints = null;
-    this.asteroidMat = null;
+    this.beltBands = [];
     this.group.add(this.orbitLinesGroup);
 
     this.activeSystemId = systemId;
     const sys = STAR_SYSTEMS_CATALOG[systemId] || STAR_SYSTEMS_CATALOG.solar;
     const rand = mulberry32(8822 + systemId.length * 91);
 
-    // Physically-correct relative speeds: angular velocity ∝ 1 / real orbital period.
-    // Normalise the innermost (fastest) world to a watchable VISUAL_ORBIT_SECONDS.
+    // Real orbital periods (days). Unknown worlds fall back to Kepler's
+    // third law scaled from Earth's orbit radius (1 AU = 19.8 units).
     const periods = sys.planets.map(
       (p) => ORBIT_PERIOD_DAYS[p.id] ?? 365.25 * Math.pow(p.orbitRadius / 19.8, 1.5)
     );
-    const referencePeriod = periods.length ? Math.min(...periods) : 365.25;
 
     // 1. Host Star — procedural photosphere shader
     const isRed = sys.star.textureType === 'sun_red';
@@ -188,31 +209,38 @@ export class StarSystemLayer implements SceneLayer {
       this.orbitLinesGroup.add(this.hzMesh);
     }
 
-    // 3. Asteroid belt (Solar System)
+    // 3. Asteroid belt (Solar System) — three radial bands, each rotating at
+    // its own Kepler rate (~2.3 / 2.7 / 3.1 AU → 3.4 / 4.4 / 5.5 yr), so the
+    // belt visibly shears: inner rocks outrun outer ones, as in reality.
     if (systemId === 'solar') {
-      const count = 3200;
-      const data = buildStarData(count, () => {
-        const r = 30.2 + rand() * 4.8;
-        const a = rand() * Math.PI * 2;
-        const shade = 0.35 + rand() * 0.3;
-        return {
-          pos: [
-            Math.cos(a) * r + gaussianRandom(rand) * 0.45,
-            gaussianRandom(rand) * 0.35,
-            Math.sin(a) * r + gaussianRandom(rand) * 0.45,
-          ],
-          color: new THREE.Color(shade * 0.85, shade * 0.82, shade * 0.78),
-          size: 0.22 + rand() * 0.35,
-          seed: rand(),
-        };
+      const bands = [
+        { from: 30.2, to: 31.9, count: 1100, periodDays: 1257 },
+        { from: 31.9, to: 33.6, count: 1100, periodDays: 1622 },
+        { from: 33.6, to: 35.0, count: 1000, periodDays: 1994 },
+      ];
+      bands.forEach((band) => {
+        const data = buildStarData(band.count, () => {
+          const r = band.from + rand() * (band.to - band.from);
+          const a = rand() * Math.PI * 2;
+          const shade = 0.35 + rand() * 0.3;
+          return {
+            pos: [
+              Math.cos(a) * r + gaussianRandom(rand) * 0.45,
+              gaussianRandom(rand) * 0.35,
+              Math.sin(a) * r + gaussianRandom(rand) * 0.45,
+            ],
+            color: new THREE.Color(shade * 0.85, shade * 0.82, shade * 0.78),
+            size: 0.22 + rand() * 0.35,
+            seed: rand(),
+          };
+        });
+        const { points, material } = createStarPoints(data, 0.6);
+        this.group.add(points);
+        this.beltBands.push({ points, material, rate: TWO_PI / band.periodDays });
       });
-      const { points, material } = createStarPoints(data, 0.6);
-      this.asteroidPoints = points;
-      this.asteroidMat = material;
-      this.group.add(points);
     }
 
-    // 4. Planets
+    // 4. Planets — one unified physical clock drives every motion
     sys.planets.forEach((pData, idx) => {
       const isHabitable =
         pData.id === 'earth' ||
@@ -220,26 +248,36 @@ export class StarSystemLayer implements SceneLayer {
         pData.id === 't1_e' ||
         pData.id === 'k_f';
 
-      const startAngle = idx * 1.15 + 0.6;
+      const startM = idx * 1.15 + 0.6;
       const ecc = ORBIT_ECCENTRICITY[pData.id] ?? 0;
       const orbitLine = createOrbitLine(
         pData.orbitRadius,
         isHabitable ? '#38bdf8' : '#64748b',
         isHabitable ? 0.55 : 0.25,
         192,
-        startAngle,
+        startM,
         ecc
       );
       this.orbitLinesGroup.add(orbitLine);
 
-      const startE = solveEccentricAnomaly(startAngle, ecc);
+      // Place the planet at its true eccentric position; the −sin term keeps
+      // the orbit prograde (counterclockwise seen from ecliptic north).
+      const startE = solveEccentricAnomaly(startM, ecc);
+      const semiMinor = pData.orbitRadius * Math.sqrt(1 - ecc * ecc);
       const planetGroup = new THREE.Group();
       planetGroup.position.set(
         Math.cos(startE) * pData.orbitRadius - pData.orbitRadius * ecc,
         0,
-        Math.sin(startE) * pData.orbitRadius * Math.sqrt(1 - ecc * ecc)
+        -Math.sin(startE) * semiMinor
       );
       this.group.add(planetGroup);
+
+      // Axial tilt on a dedicated parent group: the spin axis then stays
+      // pointing at a fixed inertial direction while the planet orbits —
+      // the geometric cause of the seasons.
+      const tiltGroup = new THREE.Group();
+      tiltGroup.rotation.z = pData.tilt || 0;
+      planetGroup.add(tiltGroup);
 
       const tex = TextureFactory.getPlanetTextures(pData.textureType, 1024, 512);
       const isGasOrIce =
@@ -260,14 +298,14 @@ export class StarSystemLayer implements SceneLayer {
         emissiveIntensity: tex.nightMap ? 0.65 : 0,
       });
 
+      // The mesh spins around the tilted axis (its own local Y).
       const pMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius, 96, 96), pMat);
-      pMesh.rotation.z = pData.tilt || 0;
       pMesh.userData = { pickType: 'planet', planetId: pData.id, systemId };
-      planetGroup.add(pMesh);
+      tiltGroup.add(pMesh);
       // Upgrade to real NASA/USGS photographic map when downloaded
       RealTextures.applyToMaterial(pData.textureType, pMat);
 
-      // Clouds
+      // Clouds drift just above the surface, inside the same tilted frame
       let cloudsMesh: THREE.Mesh | null = null;
       if (pData.hasClouds && tex.cloudMap) {
         const cMat = new THREE.MeshStandardMaterial({
@@ -278,8 +316,7 @@ export class StarSystemLayer implements SceneLayer {
           depthWrite: false,
         });
         cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius * 1.022, 96, 96), cMat);
-        cloudsMesh.rotation.z = pData.tilt || 0;
-        planetGroup.add(cloudsMesh);
+        tiltGroup.add(cloudsMesh);
         enableCloudNightFade(cMat, cloudsMesh);
         if (pData.textureType === 'earth') {
           RealTextures.applyClouds('earth', cMat, (cloudTex) => {
@@ -308,10 +345,14 @@ export class StarSystemLayer implements SceneLayer {
         planetGroup.add(atmo.mesh);
       }
 
-      // Moon
+      // Moon — orbits in a plane inclined ~5.1° to the ecliptic (not the
+      // equator), prograde, with a real 27.32-day sidereal period. Being
+      // fixed on the rotating pivot it is automatically tidally locked:
+      // the same hemisphere always faces the planet.
       let moonPivot: THREE.Group | null = null;
       if (pData.hasMoon) {
         moonPivot = new THREE.Group();
+        moonPivot.rotation.z = MOON_INCLINATION;
         planetGroup.add(moonPivot);
         const moonTex = TextureFactory.getPlanetTextures('moon', 512, 256);
         const moonMat = new THREE.MeshStandardMaterial({
@@ -329,7 +370,7 @@ export class StarSystemLayer implements SceneLayer {
         moonPivot.add(moonMesh);
       }
 
-      // Planetary rings
+      // Rings lie in the planet's equatorial plane — inside the tilted frame.
       if (pData.hasRings || pData.hasThinRing) {
         const inner = pData.hasRings ? pData.radius * 1.35 : pData.radius * 1.45;
         const outer = pData.hasRings ? pData.radius * 2.55 : pData.radius * 1.85;
@@ -341,21 +382,23 @@ export class StarSystemLayer implements SceneLayer {
           TextureFactory.getRingTexture(pData.hasRings ? 7 : 13)
         );
         ring.mesh.rotation.x = Math.PI / 2;
-        ring.mesh.rotation.y = pData.tilt || 0.4;
-        planetGroup.add(ring.mesh);
+        tiltGroup.add(ring.mesh);
         RealTextures.applyToRingMaterial(pData.hasRings ? 'saturn' : 'uranus', ring.material);
       }
 
       this.planets.push({
         data: pData,
         group: planetGroup,
+        tiltGroup,
         mesh: pMesh,
         cloudsMesh,
         moonPivot,
         orbitMaterial: orbitLine.material as THREE.ShaderMaterial,
-        angle: startAngle,
-        angularSpeed:
-          ((Math.PI * 2) / VISUAL_ORBIT_SECONDS) * (referencePeriod / periods[idx]),
+        angle: startM,
+        // Mean motion: rad per simulated day, from the real orbital period.
+        angularSpeed: TWO_PI / periods[idx],
+        // Spin: rad per simulated day, from the real sidereal rotation period.
+        spinSpeed: TWO_PI / (ROTATION_PERIOD_DAYS[pData.id] ?? 1),
         eccentricity: ecc,
       });
     });
@@ -382,8 +425,10 @@ export class StarSystemLayer implements SceneLayer {
     if (this.starMaterial) {
       this.starMaterial.uniforms.uTime.value = state.elapsedTime;
     }
-    if (this.starMesh && state.isPlaying) {
-      this.starMesh.rotation.y += dt * 0.08 * state.rotationSpeed;
+    // Sun rotates on its axis with the real 25.4-day Carrington period.
+    if (this.starMesh && state.isPlaying && state.rotationSpeed > 0) {
+      const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
+      this.starMesh.rotation.y += dtDays * SUN_SPIN_RATE;
     }
     if (this.chromoMesh) {
       this.chromoMesh.quaternion.copy(this.camera.quaternion);
@@ -395,36 +440,44 @@ export class StarSystemLayer implements SceneLayer {
     if (this.prominenceMesh && this.prominenceMaterial) {
       this.prominenceMaterial.uniforms.uTime.value = state.elapsedTime;
     }
-    if (this.asteroidPoints && this.asteroidMat) {
-      this.asteroidMat.uniforms.uTime.value = state.elapsedTime;
-      this.asteroidMat.uniforms.uScale.value =
-        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
-      if (state.isPlaying) {
-        this.asteroidPoints.rotation.y += dt * 0.03 * state.rotationSpeed;
-      }
+    // Asteroid belt: each band rotates at its own Kepler rate per simulated day.
+    if (state.isPlaying && state.rotationSpeed > 0) {
+      const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
+      this.beltBands.forEach((band) => {
+        band.points.rotation.y += dtDays * band.rate;
+      });
     }
+    this.beltBands.forEach((band) => {
+      band.material.uniforms.uTime.value = state.elapsedTime;
+      band.material.uniforms.uScale.value =
+        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+    });
 
     this.planets.forEach((p) => {
       if (state.isPlaying && state.rotationSpeed > 0) {
+        // One unified physical clock: 1 second = 1 Earth day at speed 1×.
         // Mean anomaly grows uniformly; solving Kepler's equation makes the
-        // planet move faster near perihelion and slower near aphelion.
-        p.angle += dt * p.angularSpeed * state.rotationSpeed;
+        // planet sweep faster near perihelion and slower near aphelion.
+        const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
+        p.angle += dtDays * p.angularSpeed;
         const E = solveEccentricAnomaly(p.angle, p.eccentricity);
         const a = p.data.orbitRadius;
+        const b = a * Math.sqrt(1 - p.eccentricity * p.eccentricity);
         p.group.position.set(
           Math.cos(E) * a - a * p.eccentricity,
           0,
-          Math.sin(E) * a * Math.sqrt(1 - p.eccentricity * p.eccentricity)
+          -Math.sin(E) * b
         );
-        // Axial spin and cloud drift are deliberately gentle — real rotation
-        // would be a blur at this scale; keep them well below orbital motion.
-        p.mesh.rotation.y += dt * p.data.rotSpeed * 0.22 * state.rotationSpeed;
+        // Axial spin from the real sidereal rotation period (Venus crawls,
+        // Jupiter races; Mercury's 58.6 d vs 88 d year = 3:2 resonance).
+        p.mesh.rotation.y += dtDays * p.spinSpeed;
         if (p.cloudsMesh) {
-          p.cloudsMesh.rotation.y += dt * p.data.rotSpeed * 1.24 * 0.22 * state.rotationSpeed;
+          // Clouds ride the spin plus a gentle zonal drift.
+          p.cloudsMesh.rotation.y += dtDays * p.spinSpeed * 1.12;
         }
         if (p.moonPivot) {
-          // Moon: ~27 days vs Earth's ~365 days, but softened for readability.
-          p.moonPivot.rotation.y += dt * 0.14 * state.rotationSpeed;
+          // Moon: real 27.32-day sidereal period, prograde, tidally locked.
+          p.moonPivot.rotation.y += dtDays * MOON_MEAN_MOTION;
         }
         p.orbitMaterial.uniforms.uHeadAngle.value = E;
       }

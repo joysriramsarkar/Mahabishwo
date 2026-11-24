@@ -147,6 +147,26 @@ export function createNebula(
   return { mesh, material };
 }
 
+function createOrbitPoints(
+  radius: number,
+  segments: number,
+  eccentricity: number
+): { pts: THREE.Vector3[]; angles: Float32Array } {
+  const pts: THREE.Vector3[] = [];
+  const angles = new Float32Array(segments);
+  const e = clamp(eccentricity, 0, 0.85);
+  const b = radius * Math.sqrt(1 - e * e);
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    // Focus (the host star) sits at the origin: perihelion at +X, aphelion at -X.
+    // The -sin term makes the motion prograde: counterclockwise viewed from
+    // ecliptic north (+Y), matching the real solar system's angular momentum.
+    pts.push(new THREE.Vector3(Math.cos(a) * radius - radius * e, 0, -Math.sin(a) * b));
+    angles[i] = a;
+  }
+  return { pts, angles };
+}
+
 export function createOrbitLine(
   radius: number,
   color: string,
@@ -155,16 +175,7 @@ export function createOrbitLine(
   headAngle = 0,
   eccentricity = 0
 ): THREE.LineLoop {
-  const pts: THREE.Vector3[] = [];
-  const angles = new Float32Array(segments);
-  const e = clamp(eccentricity, 0, 0.85);
-  const b = radius * Math.sqrt(1 - e * e);
-  for (let i = 0; i < segments; i++) {
-    const a = (i / segments) * Math.PI * 2;
-    // Focus (the host star) sits at the origin: perihelion at +X, aphelion at -X.
-    pts.push(new THREE.Vector3(Math.cos(a) * radius - radius * e, 0, Math.sin(a) * b));
-    angles[i] = a;
-  }
+  const { pts, angles } = createOrbitPoints(radius, segments, eccentricity);
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   geo.setAttribute('aAngle', new THREE.BufferAttribute(angles, 1));
   const mat = new THREE.ShaderMaterial({

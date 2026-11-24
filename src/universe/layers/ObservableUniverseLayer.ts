@@ -142,7 +142,7 @@ export class ObservableUniverseLayer implements SceneLayer {
     this.starMaterial.uniforms.uScale.value =
       0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
     this.filamentGroup.visible = state.layers.cosmicWeb;
-    this.group.rotation.y += dt * 0.004 * state.rotationSpeed;
+    this.group.rotation.y += dt * 0.004 * Math.min(state.rotationSpeed, 6);
   }
 
   public dispose(): void {

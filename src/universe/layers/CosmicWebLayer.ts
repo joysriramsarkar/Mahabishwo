@@ -205,7 +205,7 @@ export class CosmicWebLayer implements SceneLayer {
 
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
-    this.group.rotation.y += dt * 0.008 * state.rotationSpeed;
+    this.group.rotation.y += dt * 0.008 * Math.min(state.rotationSpeed, 6);
     this.filamentGroup.visible = state.layers.cosmicWeb;
     if (this.particleMaterial) {
       this.particleMaterial.uniforms.uTime.value = state.elapsedTime;

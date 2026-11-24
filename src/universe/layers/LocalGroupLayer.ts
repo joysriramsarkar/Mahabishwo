@@ -220,7 +220,7 @@ export class LocalGroupLayer implements SceneLayer {
 
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
-    this.group.rotation.y += dt * 0.01 * state.rotationSpeed;
+    this.group.rotation.y += dt * 0.01 * Math.min(state.rotationSpeed, 6);
     const scale = 0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
     for (const mat of this.starMaterials) {
       mat.uniforms.uTime.value = state.elapsedTime;
