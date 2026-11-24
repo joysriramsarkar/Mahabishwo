@@ -270,6 +270,7 @@ export class UIManager {
   public update(): void {
     this.minimap.update();
     this.labelsLayer.update();
+    this.infoPanel.updateTelemetry();
 
     // Sync continuous zoom slider & readout
     const slider = document.getElementById('zoom-slider') as HTMLInputElement | null;

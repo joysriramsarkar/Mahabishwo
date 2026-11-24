@@ -5,7 +5,17 @@
 import { AppState, ScaleLevel, StatItem } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
-import { SUPERCLUSTERS, GALAXIES, STAR_SYSTEMS_CATALOG, PLANET_MOONS, MoonData } from '../data/cosmicData';
+import {
+  SUPERCLUSTERS,
+  GALAXIES,
+  STAR_SYSTEMS_CATALOG,
+  PLANET_MOONS,
+  MoonData,
+  SEMI_MAJOR_AU,
+  STAR_MASS_SOLAR,
+  AU_KM,
+  EARTH_MEAN_SPEED_KMS,
+} from '../data/cosmicData';
 import { toBn } from '../utils/math';
 
 export class InfoPanel {
@@ -32,6 +42,7 @@ export class InfoPanel {
     let listItems: Array<{ label: string; color: string; onClick: () => void }> = [];
     let godsEye: { host: string; planetId: string; color: string } | null = null;
     let moonList: MoonData[] = [];
+    let telemetryPlanet: { systemId: string; planetId: string } | null = null;
     let sourceName = 'NASA Astrophysics';
     let sourceUrl = 'https://science.nasa.gov/universe/';
 
@@ -196,6 +207,7 @@ export class InfoPanel {
         sourceUrl = p.sourceUrl;
         godsEye = { host: sys.id, planetId: p.id, color: p.color };
         moonList = PLANET_MOONS[p.id] ?? [];
+        telemetryPlanet = { systemId: sys.id, planetId: p.id };
         listTitle = `${sys.nameBn}-এর অন্যান্য গ্রহ`;
         listItems = sys.planets.map((pl) => ({
           label: pl.nameBn,
@@ -280,6 +292,18 @@ export class InfoPanel {
 
       <div class="mt-3 grid grid-cols-2 gap-1.5">${statsHtml}</div>
 
+      ${
+        telemetryPlanet
+          ? `<div id="live-telemetry"
+              class="mt-3 rounded-xl border border-sky-400/25 bg-sky-500/10 px-2.5 py-2 space-y-1 text-[11px] text-slate-200">
+              <div class="text-[10px] font-semibold uppercase tracking-wider text-sky-300 mb-0.5">📡 সরাসরি ভৌত টেলিমেট্রি</div>
+              <div id="tele-distance" class="flex justify-between"><span class="text-slate-400">নক্ষত্র থেকে দূরত্ব</span><span class="font-semibold text-white">—</span></div>
+              <div id="tele-speed" class="flex justify-between"><span class="text-slate-400">কক্ষীয় গতি (vis-viva)</span><span class="font-semibold text-white">—</span></div>
+              <div id="tele-clock" class="flex justify-between"><span class="text-slate-400">সিমুলেশন ঘড়ি</span><span class="font-semibold text-white">—</span></div>
+            </div>`
+          : ''
+      }
+
       ${moonsHtml}
 
       ${
@@ -319,5 +343,56 @@ export class InfoPanel {
         listItems[idx]?.onClick();
       });
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Live orbital telemetry (vis-viva), refreshed ~6x per second.
+  // ------------------------------------------------------------------
+  private lastTelemetryAt = 0;
+
+  public updateTelemetry(): void {
+    const box = this.container.querySelector('#live-telemetry');
+    if (!box) return;
+    const now = performance.now();
+    if (now - this.lastTelemetryAt < 160) return;
+    this.lastTelemetryAt = now;
+
+    const sysId = this.state.activeSystemId || 'solar';
+    const planetId = this.state.activePlanetId;
+    const item = this.sceneManager.starSystem.planets.find(
+      (p) => p.data.id === planetId
+    );
+    const aAU = SEMI_MAJOR_AU[planetId];
+    if (!item || !aAU) return;
+
+    // Scene distance from the host star → AU via the planet's drawn orbit.
+    const rScene = item.group.position.length();
+    const rAU = (rScene / item.data.orbitRadius) * aAU;
+    // vis-viva: v = v⊕ · √(M★ · (2/r − 1/a)) — speeds up at perihelion.
+    const mStar = STAR_MASS_SOLAR[sysId] ?? 1;
+    const speed = EARTH_MEAN_SPEED_KMS * Math.sqrt(mStar * (2 / rAU - 1 / aAU));
+
+    const croreKm = (rAU * AU_KM) / 1e7;
+    const distText =
+      croreKm >= 1
+        ? `${toBn(croreKm < 100 ? croreKm.toFixed(2) : Math.round(croreKm).toLocaleString('en-IN'))} কোটি কিমি (${toBn(rAU.toFixed(rAU < 1 ? 3 : 2))} AU)`
+        : `${toBn(((rAU * AU_KM) / 1e5).toFixed(1))} লক্ষ কিমি (${toBn(rAU.toFixed(3))} AU)`;
+
+    const days = this.state.elapsedSimDays;
+    const clockText =
+      days < 365.25
+        ? `${toBn(Math.round(days))} দিন`
+        : `${toBn((days / 365.25).toFixed(1))} বছর`;
+
+    const setRow = (id: string, value: string) => {
+      const row = box.querySelector(id) as HTMLElement | null;
+      if (row) {
+        const span = row.querySelector('span:last-child');
+        if (span) span.textContent = value;
+      }
+    };
+    setRow('#tele-distance', distText);
+    setRow('#tele-speed', `${toBn(speed.toFixed(2))} কিমি/সে`);
+    setRow('#tele-clock', clockText);
   }
 }

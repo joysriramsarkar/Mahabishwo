@@ -297,6 +297,8 @@ export interface AppState {
   /** Dynamic minimum camera radius (planet collision avoidance) */
   cameraMinRadius: number;
   elapsedTime: number;       // Context-dependent time
+  /** Elapsed simulated days on the unified physical clock (1 s = 1 day at 1×). */
+  elapsedSimDays: number;    // Total simulated days since boot
   cosmicAge: number;         // Billion years since Big Bang (0 = Big Bang, 13.8 = now)
   density: DensityLevel;
   layers: LayerVisibility;

@@ -691,6 +691,11 @@ export class SceneManager {
   }
 
   public update(dt: number, _state: AppState): void {
+    // Orbital/rotational physics of the star system runs EVERY frame, even
+    // when its layer is invisible (e.g. at planet close-up), so the planet
+    // you are watching keeps moving along its Kepler orbit and tracking
+    // stays exact at any time-scale.
+    this.starSystem.integrateMotion(dt, this.state);
     this.updateContinuousZoom(dt);
     // Keep gated night-light materials, cloud shadows, and sun-aware atmospheres pointed
     // at the sun (world space) AFTER layer/planet positions update for this frame.

@@ -13,6 +13,7 @@ import { Toasts } from './ui/Toasts';
 import { CosmicAudio } from './audio/CosmicAudio';
 import { AppState, ScaleLevel } from './core/types';
 import { eventBus } from './core/EventBus';
+import { SIM_DAYS_PER_SECOND } from './data/cosmicData';
 
 export const state: AppState = {
   currentScale: ScaleLevel.OBSERVABLE_UNIVERSE,
@@ -27,6 +28,7 @@ export const state: AppState = {
   isPlaying: true,
   rotationSpeed: 1.0,
   elapsedTime: 0,
+  elapsedSimDays: 0,
   cosmicAge: 13.8,
   density: 'medium',
   layers: {
@@ -161,6 +163,8 @@ async function boot(): Promise<void> {
       // Cosmetic shader time (sun churn, twinkles) stays pleasant even at
       // extreme physics time-scales; the physical clock lives in the layers.
       state.elapsedTime += dt * Math.min(state.rotationSpeed, 4);
+      // The unified physical clock: elapsed simulated days for telemetry.
+      state.elapsedSimDays += dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
     }
 
     cameraCtrl.update(dt);

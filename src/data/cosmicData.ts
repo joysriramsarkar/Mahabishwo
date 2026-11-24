@@ -235,6 +235,38 @@ export const PLANET_MOONS: Record<string, MoonData[]> = {
  */
 export const SIM_DAYS_PER_SECOND = 1;
 
+/** One astronomical unit in kilometres. */
+export const AU_KM = 149_597_870.7;
+
+/** Earth's mean orbital speed at 1 AU around a 1-M☉ star (km/s). */
+export const EARTH_MEAN_SPEED_KMS = 29.7847;
+
+/** Real semi-major axes in AU (NASA / JPL) — used for live orbital telemetry. */
+export const SEMI_MAJOR_AU: Record<string, number> = {
+  mercury: 0.3871,
+  venus: 0.7233,
+  earth: 1.0,
+  mars: 1.5237,
+  jupiter: 5.2029,
+  saturn: 9.5367,
+  uranus: 19.1892,
+  neptune: 30.0699,
+  proxima_d: 0.029,
+  proxima_b: 0.0485,
+  t1_b: 0.01154,
+  t1_e: 0.02925,
+  t1_f: 0.03849,
+  k_f: 0.432,
+};
+
+/** Host-star masses in solar masses — used for vis-viva orbital speeds. */
+export const STAR_MASS_SOLAR: Record<string, number> = {
+  solar: 1.0,
+  proxima: 0.1221,
+  trappist: 0.0898,
+  kepler186: 0.544,
+};
+
 export const SUPERCLUSTERS: SuperclusterData[] = [
   {
     id: 'laniakea',

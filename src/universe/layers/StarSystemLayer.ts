@@ -462,16 +462,60 @@ export class StarSystemLayer implements SceneLayer {
     return worldPos;
   }
 
+  /**
+   * Orbital/rotational integration — MUST run every frame, even when the
+   * layer is invisible (e.g. while at planet close-up), so the planet you
+   * are watching keeps orbiting its star and the tracking camera follows.
+   */
+  public integrateMotion(dt: number, state: AppState): void {
+    if (!state.isPlaying || state.rotationSpeed <= 0) return;
+    // One unified physical clock: 1 second = 1 Earth day at speed 1×.
+    const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
+
+    // Sun rotates on its axis with the real 25.4-day Carrington period.
+    if (this.starMesh) {
+      this.starMesh.rotation.y += dtDays * SUN_SPIN_RATE;
+    }
+
+    // Asteroid belt: each band rotates at its own Kepler rate.
+    this.beltBands.forEach((band) => {
+      band.points.rotation.y += dtDays * band.rate;
+    });
+
+    this.planets.forEach((p) => {
+      // Mean anomaly grows uniformly; solving Kepler's equation makes the
+      // planet sweep faster near perihelion and slower near aphelion.
+      p.angle += dtDays * p.angularSpeed;
+      const E = solveEccentricAnomaly(p.angle, p.eccentricity);
+      const a = p.data.orbitRadius;
+      const b = a * Math.sqrt(1 - p.eccentricity * p.eccentricity);
+      p.group.position.set(
+        Math.cos(E) * a - a * p.eccentricity,
+        0,
+        -Math.sin(E) * b
+      );
+      // Axial spin from the real sidereal rotation period (Venus crawls,
+      // Jupiter races; Mercury's 58.6 d vs 88 d year = 3:2 resonance).
+      p.mesh.rotation.y += dtDays * p.spinSpeed;
+      if (p.cloudsMesh) {
+        // Clouds ride the spin plus a gentle zonal drift.
+        p.cloudsMesh.rotation.y += dtDays * p.spinSpeed * 1.12;
+      }
+      // Satellites: real periods, retrograde for Triton, tidal lock inherent.
+      p.moons.forEach((m) => {
+        const rate = TWO_PI / m.data.periodDays;
+        m.pivot.rotation.y += dtDays * (m.data.retrograde ? -rate : rate);
+      });
+      p.orbitMaterial.uniforms.uHeadAngle.value = E;
+    });
+  }
+
+  /** Visual/cosmetic updates only — cheap, gated on layer visibility. */
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
 
     if (this.starMaterial) {
       this.starMaterial.uniforms.uTime.value = state.elapsedTime;
-    }
-    // Sun rotates on its axis with the real 25.4-day Carrington period.
-    if (this.starMesh && state.isPlaying && state.rotationSpeed > 0) {
-      const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
-      this.starMesh.rotation.y += dtDays * SUN_SPIN_RATE;
     }
     if (this.chromoMesh) {
       this.chromoMesh.quaternion.copy(this.camera.quaternion);
@@ -483,48 +527,10 @@ export class StarSystemLayer implements SceneLayer {
     if (this.prominenceMesh && this.prominenceMaterial) {
       this.prominenceMaterial.uniforms.uTime.value = state.elapsedTime;
     }
-    // Asteroid belt: each band rotates at its own Kepler rate per simulated day.
-    if (state.isPlaying && state.rotationSpeed > 0) {
-      const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
-      this.beltBands.forEach((band) => {
-        band.points.rotation.y += dtDays * band.rate;
-      });
-    }
     this.beltBands.forEach((band) => {
       band.material.uniforms.uTime.value = state.elapsedTime;
       band.material.uniforms.uScale.value =
         0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
-    });
-
-    this.planets.forEach((p) => {
-      if (state.isPlaying && state.rotationSpeed > 0) {
-        // One unified physical clock: 1 second = 1 Earth day at speed 1×.
-        // Mean anomaly grows uniformly; solving Kepler's equation makes the
-        // planet sweep faster near perihelion and slower near aphelion.
-        const dtDays = dt * state.rotationSpeed * SIM_DAYS_PER_SECOND;
-        p.angle += dtDays * p.angularSpeed;
-        const E = solveEccentricAnomaly(p.angle, p.eccentricity);
-        const a = p.data.orbitRadius;
-        const b = a * Math.sqrt(1 - p.eccentricity * p.eccentricity);
-        p.group.position.set(
-          Math.cos(E) * a - a * p.eccentricity,
-          0,
-          -Math.sin(E) * b
-        );
-        // Axial spin from the real sidereal rotation period (Venus crawls,
-        // Jupiter races; Mercury's 58.6 d vs 88 d year = 3:2 resonance).
-        p.mesh.rotation.y += dtDays * p.spinSpeed;
-        if (p.cloudsMesh) {
-          // Clouds ride the spin plus a gentle zonal drift.
-          p.cloudsMesh.rotation.y += dtDays * p.spinSpeed * 1.12;
-        }
-        // Satellites: real periods, retrograde for Triton, tidal lock inherent.
-        p.moons.forEach((m) => {
-          const rate = TWO_PI / m.data.periodDays;
-          m.pivot.rotation.y += dtDays * (m.data.retrograde ? -rate : rate);
-        });
-        p.orbitMaterial.uniforms.uHeadAngle.value = E;
-      }
     });
 
     this.orbitLinesGroup.visible = state.layers.orbits;
