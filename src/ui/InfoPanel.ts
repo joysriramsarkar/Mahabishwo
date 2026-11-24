@@ -176,13 +176,7 @@ export class InfoPanel {
         listItems = sys.planets.map((p) => ({
           label: p.nameBn,
           color: p.color,
-          onClick: () => {
-            this.sceneManager.transitionToScale(ScaleLevel.PLANET, {
-              systemId: sys.id,
-              planetId: p.id,
-            });
-            this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
-          },
+          onClick: () => this.sceneManager.flyToPlanet(sys.id, p.id),
         }));
         break;
       }
@@ -202,13 +196,7 @@ export class InfoPanel {
         listItems = sys.planets.map((pl) => ({
           label: pl.nameBn,
           color: pl.color,
-          onClick: () => {
-            this.sceneManager.transitionToScale(ScaleLevel.PLANET, {
-              systemId: sys.id,
-              planetId: pl.id,
-            });
-            this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
-          },
+          onClick: () => this.sceneManager.flyToPlanet(sys.id, pl.id),
         }));
         break;
       }

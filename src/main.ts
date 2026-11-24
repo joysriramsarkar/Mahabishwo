@@ -90,14 +90,14 @@ async function boot(): Promise<void> {
 
     switch (hit.type) {
       case 'planet':
-        sceneManager.transitionToScale(ScaleLevel.PLANET, {
-          systemId: hit.systemId || state.activeSystemId,
-          planetId: hit.id,
-        });
-        cameraCtrl.animateTo(0.85, 1.2, 10, [0, 0, 0]);
+        sceneManager.flyToPlanet(hit.systemId || state.activeSystemId, hit.id);
         break;
       case 'star':
-        cameraCtrl.animateTo(0.85, 1.02, 30, [0, 0, 0]);
+        if (pos) {
+          cameraCtrl.animateTo(0.85, 1.02, 22, [pos.x, pos.y, pos.z]);
+        } else {
+          cameraCtrl.animateTo(0.85, 1.02, 22, [0, 0, 0]);
+        }
         break;
       case 'supercluster':
         if (hit.id === 'laniakea') {
@@ -121,7 +121,7 @@ async function boot(): Promise<void> {
         cameraCtrl.animateTo(0.85, 1.02, 44, [0, 0, 0]);
         break;
       case 'blackhole':
-        cameraCtrl.animateTo(0.45, 1.12, 68, [0, 0, 0]);
+        cameraCtrl.animateTo(0.45, 1.12, 48, pos ? [pos.x, pos.y, pos.z] : [0, 0, 0]);
         break;
     }
   };

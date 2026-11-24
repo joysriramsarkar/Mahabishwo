@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
 import { STAR_SYSTEMS_CATALOG } from '../../data/cosmicData';
-import { SUN_VERTEX, SUN_FRAGMENT } from '../../render/shaders';
+import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
 import {
@@ -18,6 +18,9 @@ import {
   createRingMesh,
   createAtmosphere,
   disposeObject,
+  enablePlanetSurfaceEffects,
+  updatePlanetCloudShadowMap,
+  enableCloudNightFade,
 } from '../helpers';
 import { mulberry32, gaussianRandom } from '../../utils/math';
 
@@ -27,6 +30,7 @@ export interface ActivePlanetItem {
   mesh: THREE.Mesh;
   cloudsMesh: THREE.Mesh | null;
   moonPivot: THREE.Group | null;
+  orbitMaterial: THREE.ShaderMaterial;
   angle: number;
 }
 
@@ -40,8 +44,11 @@ export class StarSystemLayer implements SceneLayer {
   private camera: THREE.Camera;
   private starMesh: THREE.Mesh | null = null;
   private starMaterial: THREE.ShaderMaterial | null = null;
+  private chromoMesh: THREE.Mesh | null = null;
   private coronaMesh: THREE.Mesh | null = null;
   private coronaMaterial: THREE.ShaderMaterial | null = null;
+  private prominenceMesh: THREE.LineSegments | null = null;
+  private prominenceMaterial: THREE.ShaderMaterial | null = null;
   private orbitLinesGroup = new THREE.Group();
   private hzMesh: THREE.Mesh | null = null;
   private asteroidPoints: THREE.Points | null = null;
@@ -99,11 +106,49 @@ export class StarSystemLayer implements SceneLayer {
     this.starMesh.userData = { pickType: 'star', systemId };
     this.group.add(this.starMesh);
 
-    // Corona billboard with rays
-    const corona = createShaderGlow(sys.star.glowColor, sys.star.radius * 4.4, 0.55, true, 3.1);
+    // Chromosphere inner halo + rayed corona billboard
+    const chromo = createShaderGlow(mid, sys.star.radius * 2.75, 0.78, false, 1.4);
+    this.chromoMesh = chromo.mesh;
+    this.group.add(this.chromoMesh);
+
+    const corona = createShaderGlow(sys.star.glowColor, sys.star.radius * 4.6, 0.52, true, 3.1);
     this.coronaMesh = corona.mesh;
     this.coronaMaterial = corona.material;
     this.group.add(this.coronaMesh);
+
+    // Solar prominences — arching plasma loops above the photosphere
+    const prominenceCount = 24;
+    const segmentsPerArch = 16;
+    const promPositions: number[] = [];
+    for (let a = 0; a < prominenceCount; a++) {
+      const angle = (a / prominenceCount) * Math.PI * 2;
+      for (let s = 0; s < segmentsPerArch - 1; s++) {
+        const t1 = s / (segmentsPerArch - 1);
+        const t2 = (s + 1) / (segmentsPerArch - 1);
+        const p1 = t1 <= 0.5 ? t1 * 2 : (1 - t1) * 2;
+        const p2 = t2 <= 0.5 ? t2 * 2 : (1 - t2) * 2;
+        promPositions.push(angle / (Math.PI * 2), p1, a / prominenceCount);
+        promPositions.push(angle / (Math.PI * 2), p2, a / prominenceCount);
+      }
+    }
+    const promGeo = new THREE.BufferGeometry();
+    promGeo.setAttribute('position', new THREE.Float32BufferAttribute(promPositions, 3));
+    this.prominenceMaterial = new THREE.ShaderMaterial({
+      vertexShader: PROMINENCE_VERTEX,
+      fragmentShader: PROMINENCE_FRAGMENT,
+      uniforms: {
+        uTime: { value: 0 },
+        uRadius: { value: sys.star.radius },
+        uColor: { value: new THREE.Color('#ff6b35') },
+        uOpacity: { value: 1 },
+      },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.prominenceMesh = new THREE.LineSegments(promGeo, this.prominenceMaterial!);
+    this.prominenceMesh.frustumCulled = false;
+    this.group.add(this.prominenceMesh);
 
     // 2. Habitable Zone ring
     if (sys.habitableZone) {
@@ -152,14 +197,16 @@ export class StarSystemLayer implements SceneLayer {
         pData.id === 't1_e' ||
         pData.id === 'k_f';
 
+      const startAngle = idx * 1.15 + 0.6;
       const orbitLine = createOrbitLine(
         pData.orbitRadius,
         isHabitable ? '#38bdf8' : '#64748b',
-        isHabitable ? 0.55 : 0.25
+        isHabitable ? 0.55 : 0.25,
+        192,
+        startAngle
       );
       this.orbitLinesGroup.add(orbitLine);
 
-      const startAngle = idx * 1.15 + 0.6;
       const planetGroup = new THREE.Group();
       planetGroup.position.set(
         Math.cos(startAngle) * pData.orbitRadius,
@@ -169,19 +216,25 @@ export class StarSystemLayer implements SceneLayer {
       this.group.add(planetGroup);
 
       const tex = TextureFactory.getPlanetTextures(pData.textureType, 1024, 512);
+      const isGasOrIce =
+        pData.textureType === 'jupiter' ||
+        pData.textureType === 'saturn' ||
+        pData.textureType === 'uranus' ||
+        pData.textureType === 'neptune' ||
+        pData.textureType === 'venus';
       const pMat = new THREE.MeshStandardMaterial({
         map: tex.map,
-        bumpMap: tex.bumpMap ?? null,
-        bumpScale: 0.04,
+        bumpMap: isGasOrIce ? null : (tex.bumpMap ?? null),
+        bumpScale: isGasOrIce ? 0 : 0.008,
         roughnessMap: tex.roughnessMap ?? null,
-        roughness: 0.85,
-        metalness: 0.04,
+        roughness: isGasOrIce ? 0.72 : 0.86,
+        metalness: 0.02,
         emissive: tex.nightMap ? new THREE.Color('#ffe08a') : new THREE.Color('#000000'),
         emissiveMap: tex.nightMap ?? null,
-        emissiveIntensity: tex.nightMap ? 0.55 : 0,
+        emissiveIntensity: tex.nightMap ? 0.65 : 0,
       });
 
-      const pMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius, 48, 48), pMat);
+      const pMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius, 96, 96), pMat);
       pMesh.rotation.z = pData.tilt || 0;
       pMesh.userData = { pickType: 'planet', planetId: pData.id, systemId };
       planetGroup.add(pMesh);
@@ -198,11 +251,25 @@ export class StarSystemLayer implements SceneLayer {
           roughness: 0.9,
           depthWrite: false,
         });
-        cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius * 1.022, 48, 48), cMat);
+        cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(pData.radius * 1.022, 96, 96), cMat);
         cloudsMesh.rotation.z = pData.tilt || 0;
         planetGroup.add(cloudsMesh);
-        if (pData.textureType === 'earth') RealTextures.applyClouds('earth', cMat);
+        enableCloudNightFade(cMat, cloudsMesh);
+        if (pData.textureType === 'earth') {
+          RealTextures.applyClouds('earth', cMat, (cloudTex) => {
+            updatePlanetCloudShadowMap(pMat, cloudTex);
+          });
+        }
       }
+
+      // Unified surface effects: night terminator lights + moving ray-projected cloud shadows
+      enablePlanetSurfaceEffects(pMat, pMesh, {
+        nightLights: !!tex.nightMap,
+        cloudMap: pData.hasClouds ? tex.cloudMap ?? null : null,
+        cloudMesh: cloudsMesh,
+        cloudRadiusRatio: 1.022,
+        microDetail: !isGasOrIce,
+      });
 
       // Atmosphere rim
       if (pData.atmosphereColor) {
@@ -244,12 +311,13 @@ export class StarSystemLayer implements SceneLayer {
           inner,
           outer,
           pData.hasRings ? '#f5e6c4' : '#93c5fd',
-          new THREE.Vector3(-1, 0.2, 0),
+          pData.radius,
           TextureFactory.getRingTexture(pData.hasRings ? 7 : 13)
         );
         ring.mesh.rotation.x = Math.PI / 2;
         ring.mesh.rotation.y = pData.tilt || 0.4;
         planetGroup.add(ring.mesh);
+        RealTextures.applyToRingMaterial(pData.hasRings ? 'saturn' : 'uranus', ring.material);
       }
 
       this.planets.push({
@@ -258,6 +326,7 @@ export class StarSystemLayer implements SceneLayer {
         mesh: pMesh,
         cloudsMesh,
         moonPivot,
+        orbitMaterial: orbitLine.material as THREE.ShaderMaterial,
         angle: startAngle,
       });
     });
@@ -269,6 +338,15 @@ export class StarSystemLayer implements SceneLayer {
     return targets;
   }
 
+  /** Get a planet's current world position (for fly-to anywhere). */
+  public getPlanetWorldPosition(planetId: string): THREE.Vector3 | null {
+    const item = this.planets.find((p) => p.data.id === planetId);
+    if (!item) return null;
+    const worldPos = new THREE.Vector3();
+    item.group.getWorldPosition(worldPos);
+    return worldPos;
+  }
+
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
 
@@ -278,9 +356,15 @@ export class StarSystemLayer implements SceneLayer {
     if (this.starMesh && state.isPlaying) {
       this.starMesh.rotation.y += dt * 0.08 * state.rotationSpeed;
     }
+    if (this.chromoMesh) {
+      this.chromoMesh.quaternion.copy(this.camera.quaternion);
+    }
     if (this.coronaMesh && this.coronaMaterial) {
       this.coronaMesh.quaternion.copy(this.camera.quaternion);
       this.coronaMaterial.uniforms.uTime.value = state.elapsedTime;
+    }
+    if (this.prominenceMesh && this.prominenceMaterial) {
+      this.prominenceMaterial.uniforms.uTime.value = state.elapsedTime;
     }
     if (this.asteroidPoints && this.asteroidMat) {
       this.asteroidMat.uniforms.uTime.value = state.elapsedTime;
@@ -306,6 +390,7 @@ export class StarSystemLayer implements SceneLayer {
         if (p.moonPivot) {
           p.moonPivot.rotation.y += dt * 0.65 * state.rotationSpeed;
         }
+        p.orbitMaterial.uniforms.uHeadAngle.value = p.angle;
       }
     });
 

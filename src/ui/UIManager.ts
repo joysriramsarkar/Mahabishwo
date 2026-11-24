@@ -156,12 +156,10 @@ export class UIManager {
         break;
       }
       case 'earth':
-        this.sceneManager.transitionToScale(ScaleLevel.PLANET, { systemId: 'solar', planetId: 'earth' });
-        this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
+        this.sceneManager.flyToPlanet('solar', 'earth');
         break;
       case 'proxima':
-        this.sceneManager.transitionToScale(ScaleLevel.PLANET, { systemId: 'proxima', planetId: 'proxima_b' });
-        this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
+        this.sceneManager.flyToPlanet('proxima', 'proxima_b');
         break;
       case 'trappist': {
         const sys = STAR_SYSTEMS_CATALOG.trappist;
@@ -170,8 +168,7 @@ export class UIManager {
         break;
       }
       case 'kepler186':
-        this.sceneManager.transitionToScale(ScaleLevel.PLANET, { systemId: 'kepler186', planetId: 'k_f' });
-        this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
+        this.sceneManager.flyToPlanet('kepler186', 'k_f');
         break;
     }
   }

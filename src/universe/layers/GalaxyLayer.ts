@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { AppState, SceneLayer } from '../../core/types';
-import { DISK_VERTEX, DISK_FRAGMENT } from '../../render/shaders';
+import { DISK_VERTEX, DISK_FRAGMENT, BH_LENS_VERTEX, BH_LENS_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { buildStarData, createStarPoints, createGlowSprite, createOrbitLine } from '../helpers';
 import { mulberry32, gaussianRandom } from '../../utils/math';
@@ -18,6 +18,7 @@ export class GalaxyLayer implements SceneLayer {
   public visible = false;
   public pickTargets: THREE.Object3D[] = [];
 
+  private camera: THREE.Camera;
   private starPoints: THREE.Points;
   private starMaterial: THREE.ShaderMaterial;
   private diskMesh: THREE.Mesh | null = null;
@@ -26,10 +27,13 @@ export class GalaxyLayer implements SceneLayer {
   private haloGroup = new THREE.Group();
   private blackHoleGroup = new THREE.Group();
   private diskMaterial: THREE.ShaderMaterial;
+  private bhLensMesh: THREE.Mesh | null = null;
+  private bhLensMaterial: THREE.ShaderMaterial | null = null;
   private orbitRing: THREE.LineLoop;
   private solarBeacon: THREE.Mesh;
 
-  constructor() {
+  constructor(camera: THREE.Camera) {
+    this.camera = camera;
     const rand = mulberry32(42108);
 
     // 1. Spiral arms, bar & bulge stars
@@ -120,62 +124,100 @@ export class GalaxyLayer implements SceneLayer {
     this.starMaterial = material;
     this.group.add(points);
 
-    // 1b. Photographic integrated-light disk (soft glow under the star points)
+    // 1b. Photographic integrated-light disk (1024px with carved dust lanes)
     const diskTex = GalaxyLayer.makeDiskTexture(arms, barAngle);
     const diskMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(118, 118),
       new THREE.MeshBasicMaterial({
         map: diskTex,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.48,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       })
     );
     diskMesh.rotation.x = -Math.PI / 2;
-    diskMesh.position.y = -0.35;
+    diskMesh.position.y = -0.25;
     diskMesh.renderOrder = -1;
     this.diskMesh = diskMesh;
     this.group.add(diskMesh);
 
-    // 2. Central bulge glow
-    const bulgeGlow = createGlowSprite('#fed7aa', 15, 0.3, '#fff7ed');
+    // 2. 3D Oblate Galactic Bulge (nested warm stellar core shells + soft halo)
+    const bulgeInner = new THREE.Mesh(
+      new THREE.SphereGeometry(5.2, 32, 24),
+      new THREE.MeshBasicMaterial({
+        color: '#fff3db',
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    bulgeInner.scale.set(1.38, 0.56, 1.05);
+    bulgeInner.rotation.y = -barAngle;
+    this.group.add(bulgeInner);
+
+    const bulgeOuter = new THREE.Mesh(
+      new THREE.SphereGeometry(9.6, 32, 24),
+      new THREE.MeshBasicMaterial({
+        color: '#fdba74',
+        transparent: true,
+        opacity: 0.09,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    bulgeOuter.scale.set(1.45, 0.48, 1.02);
+    bulgeOuter.rotation.y = -barAngle;
+    this.group.add(bulgeOuter);
+
+    const bulgeGlow = createGlowSprite('#fed7aa', 15, 0.26, '#fff7ed');
     this.group.add(bulgeGlow);
 
-    // 2b. Glowing H-II star-forming nebulae along the spiral arms
-    for (let i = 0; i < 22; i++) {
+    // 2b. Glowing H-II star-forming nebulae lying IN the galactic disk plane
+    const nebPinkTex = TextureFactory.getGlowTexture('rgba(253,213,234,0.9)', '#ec4899', 'rgba(0,0,0,0)');
+    const nebBlueTex = TextureFactory.getGlowTexture('rgba(207,242,254,0.9)', '#38bdf8', 'rgba(0,0,0,0)');
+    for (let i = 0; i < 30; i++) {
       const r = 10 + rand() * 36;
       const arm = arms[i % arms.length];
       const ang = arm.offset + 0.24 * Math.pow(r, 0.76) + (rand() - 0.5) * 0.14;
       const isPink = rand() < 0.65;
-      const sp = createGlowSprite(
-        isPink ? '#ec4899' : '#38bdf8',
-        2.4 + rand() * 3.0,
-        0.12 + rand() * 0.08,
-        isPink ? '#fbcfe8' : '#bae6fd'
-      );
-      sp.position.set(Math.cos(ang) * r, (rand() - 0.5) * 0.7, Math.sin(ang) * r);
-      this.nebulaGroup.add(sp);
+      const mat = new THREE.MeshBasicMaterial({
+        map: isPink ? nebPinkTex : nebBlueTex,
+        transparent: true,
+        opacity: 0.22 + rand() * 0.14,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const s = 2.6 + rand() * 3.4;
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(s, s * 0.68), mat);
+      plane.position.set(Math.cos(ang) * r, (rand() - 0.5) * 0.55, Math.sin(ang) * r);
+      plane.rotation.x = -Math.PI / 2 + (rand() - 0.5) * 0.16;
+      plane.rotation.z = -ang + (rand() - 0.5) * 0.4;
+      this.nebulaGroup.add(plane);
     }
     this.group.add(this.nebulaGroup);
 
-    // 3. Dark dust lanes along inner spiral arms
+    // 3. Dark dust lanes lying IN the galactic plane (not camera-facing billboards)
     const dustTex = TextureFactory.getDustTexture(19);
-    for (let i = 0; i < 26; i++) {
-      const r = 8 + rand() * 34;
+    for (let i = 0; i < 36; i++) {
+      const r = 7.5 + rand() * 36;
       const arm = arms[i % arms.length];
       const ang = arm.offset + 0.24 * Math.pow(r, 0.76) - 0.12;
-      const mat = new THREE.SpriteMaterial({
+      const mat = new THREE.MeshBasicMaterial({
         map: dustTex,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.34,
         depthWrite: false,
+        side: THREE.DoubleSide,
       });
-      const sp = new THREE.Sprite(mat);
-      sp.position.set(Math.cos(ang) * r, (rand() - 0.5) * 0.8, Math.sin(ang) * r);
-      const s = 5 + rand() * 7;
-      sp.scale.set(s, s * 0.45, 1);
-      this.dustGroup.add(sp);
+      const s = 5.5 + rand() * 7.5;
+      const lane = new THREE.Mesh(new THREE.PlaneGeometry(s, s * 0.42), mat);
+      lane.position.set(Math.cos(ang) * r, (rand() - 0.5) * 0.45, Math.sin(ang) * r);
+      lane.rotation.x = -Math.PI / 2 + (rand() - 0.5) * 0.1;
+      lane.rotation.z = -ang + 0.28;
+      this.dustGroup.add(lane);
     }
     this.group.add(this.dustGroup);
 
@@ -227,13 +269,33 @@ export class GalaxyLayer implements SceneLayer {
     disk.rotation.x = Math.PI / 2 - 0.18;
     this.blackHoleGroup.add(disk);
 
-    const photonGlow = createGlowSprite('#fbbf24', 3.4, 0.5, '#fef08a');
+    // Gravitational lensing halo + photon sphere ring (camera-facing)
+    this.bhLensMaterial = new THREE.ShaderMaterial({
+      vertexShader: BH_LENS_VERTEX,
+      fragmentShader: BH_LENS_FRAGMENT,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 1 },
+        uColorHot: { value: new THREE.Color('#fff4cc') },
+        uColorCool: { value: new THREE.Color('#f97316') },
+      },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.bhLensMesh = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 7.8), this.bhLensMaterial);
+    this.bhLensMesh.frustumCulled = false;
+    this.blackHoleGroup.add(this.bhLensMesh);
+
+    const photonGlow = createGlowSprite('#fbbf24', 3.4, 0.38, '#fef08a');
     this.blackHoleGroup.add(photonGlow);
     this.group.add(this.blackHoleGroup);
 
     // 6. Solar System orbit & pulsing marker
     const solarRadius = Math.hypot(SOLAR_GALACTIC_POS.x, SOLAR_GALACTIC_POS.z);
-    this.orbitRing = createOrbitLine(solarRadius, '#fef08a', 0.42);
+    const solarAngle = Math.atan2(SOLAR_GALACTIC_POS.z, SOLAR_GALACTIC_POS.x);
+    this.orbitRing = createOrbitLine(solarRadius, '#fef08a', 0.42, 220, solarAngle);
     this.orbitRing.position.y = 0.2;
     this.group.add(this.orbitRing);
 
@@ -272,12 +334,12 @@ export class GalaxyLayer implements SceneLayer {
     this.pickTargets.push(bhPick);
   }
 
-  /** Soft photographic spiral glow rendered to a canvas texture. */
+  /** Soft photographic spiral glow (1024px) with carved inner-arm dust lanes. */
   private static makeDiskTexture(
     arms: Array<{ offset: number; major: boolean }>,
     barAngle: number
   ): THREE.CanvasTexture {
-    const size = 512;
+    const size = 1024;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -288,43 +350,60 @@ export class GalaxyLayer implements SceneLayer {
     const px = size / 118; // world unit -> px
 
     // Warm core glow
-    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 15 * px);
-    core.addColorStop(0, 'rgba(255,240,214,0.55)');
-    core.addColorStop(0.4, 'rgba(254,215,170,0.22)');
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 17 * px);
+    core.addColorStop(0, 'rgba(255,243,218,0.62)');
+    core.addColorStop(0.35, 'rgba(254,215,170,0.26)');
     core.addColorStop(1, 'rgba(254,215,170,0)');
     ctx.fillStyle = core;
     ctx.fillRect(0, 0, size, size);
 
-    // Spiral arm light
-    for (let i = 0; i < 5200; i++) {
+    // Spiral arm star clouds
+    for (let i = 0; i < 9500; i++) {
       const arm = arms[i % arms.length];
-      const r = 6 + Math.pow(rand(), 0.72) * 46;
+      const r = 5.5 + Math.pow(rand(), 0.74) * 47;
       const winding = 0.24 * Math.pow(r, 0.76);
-      const scatter = (arm.major ? 2.2 : 3.1) * (0.45 + r / 48);
+      const scatter = (arm.major ? 2.1 : 3.0) * (0.42 + r / 48);
       const ang = arm.offset + winding + (gaussianRandom(rand) * scatter) / Math.max(8, r);
       const x = cx + Math.cos(ang) * r * px;
       const y = cy + Math.sin(ang) * r * px * 0.98;
       const t = Math.min(1, r / 50);
       let col = '147,197,253';
-      if (t < 0.35) col = '254,215,170';
+      if (t < 0.36) col = '254,215,170';
       else if (rand() < 0.16) col = '244,114,182';
-      const a = 0.028 + rand() * 0.05;
+      const a = 0.024 + rand() * 0.044;
       ctx.fillStyle = `rgba(${col},${a})`;
       ctx.beginPath();
-      ctx.arc(x, y, 0.8 + rand() * 1.9, 0, Math.PI * 2);
+      ctx.arc(x, y, (0.9 + rand() * 2.1) * (size / 512), 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Carve inner-edge dust lanes using destination-out so dark lanes break up the glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 1600; i++) {
+      const arm = arms[i % arms.length];
+      const r = 7 + rand() * 38;
+      const winding = 0.24 * Math.pow(r, 0.76);
+      const ang = arm.offset + winding - 0.095 + gaussianRandom(rand) * 0.045;
+      const x = cx + Math.cos(ang) * r * px;
+      const y = cy + Math.sin(ang) * r * px * 0.98;
+      ctx.fillStyle = `rgba(0,0,0,${0.08 + rand() * 0.16})`;
+      ctx.beginPath();
+      ctx.arc(x, y, (1.4 + rand() * 2.6) * (size / 512), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
 
     // Bar light
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(barAngle);
-    const barGrad = ctx.createLinearGradient(-10 * px, 0, 10 * px, 0);
+    const barGrad = ctx.createLinearGradient(-11 * px, 0, 11 * px, 0);
     barGrad.addColorStop(0, 'rgba(254,215,170,0)');
-    barGrad.addColorStop(0.5, 'rgba(254,215,170,0.16)');
+    barGrad.addColorStop(0.5, 'rgba(254,215,170,0.2)');
     barGrad.addColorStop(1, 'rgba(254,215,170,0)');
     ctx.fillStyle = barGrad;
-    ctx.fillRect(-10 * px, -1.7 * px, 20 * px, 3.4 * px);
+    ctx.fillRect(-11 * px, -1.9 * px, 22 * px, 3.8 * px);
     ctx.restore();
 
     const tex = new THREE.CanvasTexture(canvas);
@@ -352,6 +431,13 @@ export class GalaxyLayer implements SceneLayer {
       state.density === 'high' ? 0.95 : state.density === 'low' ? 0.6 : 0.8;
 
     this.diskMaterial.uniforms.uTime.value = state.elapsedTime;
+    if (this.bhLensMesh && this.bhLensMaterial) {
+      this.bhLensMaterial.uniforms.uTime.value = state.elapsedTime;
+      this.bhLensMesh.quaternion
+        .copy(this.group.quaternion)
+        .invert()
+        .multiply(this.camera.quaternion);
+    }
 
     this.starPoints.visible = state.layers.stars;
     if (this.diskMesh) this.diskMesh.visible = state.layers.stars;

@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { Engine } from './Engine';
-import { AppState, ScaleLevel } from './types';
+import { AppState, ScaleLevel, PlanetData } from './types';
 import { eventBus } from './EventBus';
 import { CameraController } from './CameraController';
 import { ObservableUniverseLayer } from '../universe/layers/ObservableUniverseLayer';
@@ -18,10 +18,11 @@ import { LocalGroupLayer } from '../universe/layers/LocalGroupLayer';
 import { GalaxyLayer, SOLAR_GALACTIC_POS } from '../universe/layers/GalaxyLayer';
 import { StarSystemLayer } from '../universe/layers/StarSystemLayer';
 import { PlanetLayer } from '../universe/layers/PlanetLayer';
-import { buildStarData, createStarPoints } from '../universe/helpers';
+import { buildStarData, createStarPoints, updateNightTerminators, updateSunDirections } from '../universe/helpers';
+import { GALAXY_SKY_VERTEX, GALAXY_SKY_FRAGMENT } from '../render/shaders';
 import { STAR_SYSTEMS_CATALOG, GALAXIES } from '../data/cosmicData';
 import { RealTextures } from '../render/RealTextures';
-import { mulberry32, clamp } from '../utils/math';
+import { mulberry32, gaussianRandom, clamp } from '../utils/math';
 
 interface FadeEntry {
   mat: THREE.Material & { opacity: number; transparent: boolean; depthWrite: boolean };
@@ -65,6 +66,8 @@ export class SceneManager {
   private slots: LayerSlot[] = [];
   private backgroundStars: THREE.Points | null = null;
   private backgroundMat: THREE.ShaderMaterial | null = null;
+  private galaxySkyMesh: THREE.Mesh | null = null;
+  private galaxySkyMat: THREE.ShaderMaterial | null = null;
   private raycaster = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private cameraCtrl: CameraController | null = null;
@@ -72,8 +75,12 @@ export class SceneManager {
   private reportedScale: ScaleLevel = ScaleLevel.OBSERVABLE_UNIVERSE;
   private lightingScale: ScaleLevel = ScaleLevel.OBSERVABLE_UNIVERSE;
   private prevZoomT = 0;
+  private prevGalaxyAnchorQ = 0;
+  private enteredLocalGroup = false;
+  private enteredMilkyWay = false;
+  private enteredStarSystem = false;
+  private enteredPlanet = false;
   private anchorTmp = new THREE.Vector3();
-  private planetAnchor = new THREE.Vector3();
   private worldTmp = new THREE.Vector3();
 
   constructor(engine: Engine, state: AppState) {
@@ -83,7 +90,7 @@ export class SceneManager {
     this.observableUniverse = new ObservableUniverseLayer();
     this.cosmicWeb = new CosmicWebLayer();
     this.localGroup = new LocalGroupLayer();
-    this.galaxy = new GalaxyLayer();
+    this.galaxy = new GalaxyLayer(engine.camera);
     this.starSystem = new StarSystemLayer(engine.camera);
     this.planet = new PlanetLayer();
   }
@@ -217,45 +224,127 @@ export class SceneManager {
   }
 
   // ----------------------------------------------------------------
-  // Continuous blending
+  // Continuous blending with context-aware portal gating
   // ----------------------------------------------------------------
   private updateContinuousZoom(dt: number): void {
     const t = clamp(this.state.zoomLevel, 0, 6);
+    const isTransitioning = this.cameraCtrl?.getIsTransitioning() ?? false;
+    const target = this.cameraCtrl?.coords.desiredTarget;
 
-    // Dynamic camera floor: don't fall inside the planet / sun
-    this.state.cameraMinRadius = t > 4.55 ? 3.7 : GLOBAL_MIN_HELPER(t);
+    if (!isTransitioning) {
+      if (t < 1.05) this.enteredLocalGroup = false;
+      if (t < 2.05) this.enteredMilkyWay = false;
+      if (t < 3.05) {
+        this.enteredStarSystem = false;
+        this.prevGalaxyAnchorQ = 0;
+      }
+      if (t < 4.12) {
+        if (this.enteredPlanet) this.cameraCtrl?.releaseTracking();
+        this.enteredPlanet = false;
+      }
 
-    // Auto-select the planet nearest to the camera target at the moment
-    // of crossing System -> Planet (world positions, once per crossing),
-    // so zooming onto Mars opens Mars, zooming onto Jupiter opens Jupiter.
-    const crossingIntoPlanet = this.prevZoomT < 4.35 && t >= 4.35;
-    if (crossingIntoPlanet && this.cameraCtrl) {
-      const target = this.cameraCtrl.coords.desiredTarget;
-      let bestId: string | null = null;
-      let bestDist = Infinity;
-      this.starSystem.planets.forEach((p) => {
-        p.group.getWorldPosition(this.worldTmp);
-        const d = this.worldTmp.distanceToSquared(target);
-        if (d < bestDist) {
-          bestDist = d;
-          bestId = p.data.id;
+      if (target) {
+        if (!this.enteredLocalGroup && t >= 1.2 && target.length() < 42) {
+          this.enteredLocalGroup = true;
         }
-      });
-      if (bestId && bestId !== this.state.activePlanetId) {
-        this.state.activePlanetId = bestId;
-        const sys = STAR_SYSTEMS_CATALOG[this.state.activeSystemId || 'solar'];
-        const pData = sys?.planets.find((p) => p.id === bestId);
-        if (pData) {
-          this.planet.setPlanet(pData);
-          this.refreshSlotFades();
-          eventBus.emit({
-            type: 'SCALE_CHANGE',
-            from: ScaleLevel.PLANET,
-            to: ScaleLevel.PLANET,
+        if (this.enteredLocalGroup && !this.enteredMilkyWay && t >= 2.2 && target.length() < 10) {
+          this.enteredMilkyWay = true;
+        }
+        if (this.enteredMilkyWay && !this.enteredStarSystem && t >= 3.2) {
+          this.getChildAnchor(3, this.anchorTmp);
+          if (target.distanceTo(this.anchorTmp) < 12) {
+            this.enteredStarSystem = true;
+          }
+        }
+        if (this.enteredStarSystem && t >= 4.22) {
+          let bestItem = this.starSystem.planets[0] || null;
+          let bestDist = Infinity;
+          this.starSystem.planets.forEach((p) => {
+            p.group.getWorldPosition(this.worldTmp);
+            const d = this.worldTmp.distanceTo(target);
+            if (d < bestDist) {
+              bestDist = d;
+              bestItem = p;
+            }
           });
+
+          if (!this.enteredPlanet) {
+            const captureDist = bestItem ? Math.max(4.5, bestItem.data.radius * 3.0) : 0;
+            if (bestItem && bestDist <= captureDist) {
+              this.enteredPlanet = true;
+              this.selectActivePlanet(bestItem.data);
+              this.cameraCtrl?.trackObject(bestItem.group, true);
+            }
+          } else if (this.cameraCtrl && !this.cameraCtrl.getTrackedObject()) {
+            // User panned or zoomed out from the tracked planet -> check if near another planet or release
+            const activeItem = this.starSystem.planets.find(
+              (p) => p.data.id === this.state.activePlanetId
+            );
+            activeItem?.group.getWorldPosition(this.worldTmp);
+            const activeDist = activeItem ? this.worldTmp.distanceTo(target) : Infinity;
+            const releaseDist = activeItem ? Math.max(6.0, activeItem.data.radius * 3.5) : 0;
+            if (activeDist > releaseDist) {
+              const captureDist = bestItem ? Math.max(4.5, bestItem.data.radius * 3.0) : 0;
+              if (bestItem && bestDist <= captureDist) {
+                this.selectActivePlanet(bestItem.data);
+                this.cameraCtrl.trackObject(bestItem.group, true);
+              } else {
+                this.enteredPlanet = false;
+              }
+            }
+          }
         }
       }
     }
+
+    const effectiveMaxScale = !this.enteredLocalGroup
+      ? 1
+      : !this.enteredMilkyWay
+      ? 2
+      : !this.enteredStarSystem
+      ? 3
+      : !this.enteredPlanet
+      ? 4
+      : 6;
+    const tEff = Math.min(t, effectiveMaxScale);
+
+    // Lockstep recentering when manually zooming between Milky Way (Orion Spur) and Star System
+    if (this.enteredStarSystem && !isTransitioning && target) {
+      const qGal = tEff >= 3 && tEff <= 3.85 ? smooth((tEff - 3) / 0.85) : tEff > 3.85 ? 1 : 0;
+      const dq = qGal - this.prevGalaxyAnchorQ;
+      if (Math.abs(dq) > 1e-5) {
+        this.getChildAnchor(3, this.anchorTmp);
+        target.addScaledVector(this.anchorTmp, -dq);
+        this.cameraCtrl?.coords.target.addScaledVector(this.anchorTmp, -dq);
+      }
+      this.prevGalaxyAnchorQ = qGal;
+    }
+
+    // Dynamic camera floor: prevent clipping into planets, host star, or Sgr A*
+    let minR = 2.0;
+    if (this.enteredPlanet && tEff > 4.3) {
+      const floorBlend = smooth((tEff - 4.3) / 0.5);
+      minR = THREE.MathUtils.lerp(2.0, 4.35, floorBlend);
+    } else if (this.enteredStarSystem && !this.enteredPlanet && tEff >= 3.55 && target) {
+      const sys = STAR_SYSTEMS_CATALOG[this.state.activeSystemId || 'solar'];
+      const starR = sys?.star.radius ?? 4.8;
+      if (target.length() < starR + 5.0) {
+        minR = Math.max(4.0, starR + 1.4);
+      }
+    } else if (this.enteredMilkyWay && !this.enteredStarSystem && tEff >= 2.75 && target) {
+      if (target.length() < 7.0) {
+        minR = 2.6;
+      }
+    }
+    this.state.cameraMinRadius = minR;
+
+    // Close-up orbit fade and low-res planet handoff inside StarSystem
+    const closeUpOrbitFade =
+      this.enteredPlanet && tEff > 4.35 ? 1 - smooth((tEff - 4.35) / 0.55) : 1;
+    const hideActiveInSystem = this.enteredPlanet && tEff >= 4.5;
+    this.starSystem.planets.forEach((p) => {
+      p.group.visible = !(hideActiveInSystem && p.data.id === this.state.activePlanetId);
+    });
 
     this.slots.forEach((slot) => {
       const i = slot.level;
@@ -265,20 +354,33 @@ export class SceneManager {
       let posX = 0, posY = 0, posZ = 0;
 
       if (i === 5) {
-        // Planet layer also serves Surface (level 6)
-        if (t >= 5) {
-          alpha = 1;
-          scale = 1;
-        } else {
-          const d = t - 5;
-          if (d > -0.8) {
-            const q = smooth((d + 0.8) / 0.8);
-            alpha = q;
-            scale = THREE.MathUtils.lerp(INCOMING_START_SCALE[5], 1, q);
+        if (this.enteredPlanet && tEff > 4.22) {
+          alpha = smooth((tEff - 4.22) / 0.28);
+          const qScale = smooth((tEff - 4.22) / 0.78);
+          const activeItem = this.starSystem.planets.find(
+            (p) => p.data.id === this.state.activePlanetId
+          );
+          const pRadius = activeItem?.data.radius ?? 1.35;
+          scale = THREE.MathUtils.lerp(pRadius / 3.2, 1.0, qScale);
+          if (activeItem) {
+            posX = activeItem.group.position.x;
+            posY = activeItem.group.position.y;
+            posZ = activeItem.group.position.z;
           }
         }
+      } else if (i === 4) {
+        const d = tEff - 4;
+        if (d >= -0.8 && d < 0) {
+          const q = smooth((d + 0.8) / 0.8);
+          alpha = q;
+          scale = THREE.MathUtils.lerp(INCOMING_START_SCALE[4], 1, q);
+        } else if (d >= 0) {
+          // Keep StarSystem centered at (0,0,0) so Sun & sibling worlds stay in real orbital space
+          alpha = closeUpOrbitFade;
+          scale = 1;
+        }
       } else {
-        const d = t - i;
+        const d = tEff - i;
         if (d >= -0.8 && d < 0) {
           const q = smooth((d + 0.8) / 0.8);
           alpha = q;
@@ -287,15 +389,11 @@ export class SceneManager {
           const q = smooth(d / 0.85);
           alpha = 1 - q;
           scale = 1 + q * 2.1;
-          // Anchor of the next level drifts to the center as we pass through
           const anchor = this.getChildAnchor(i, new THREE.Vector3());
           const k = 1 - q - scale;
           posX = anchor.x * k;
           posY = anchor.y * k;
           posZ = anchor.z * k;
-        } else if (Math.abs(d) < 0.01) {
-          alpha = 1;
-          scale = 1;
         }
       }
 
@@ -310,19 +408,27 @@ export class SceneManager {
       slot.layer.update(dt, this.state);
     });
 
-    // Background starfield dims slightly on planetary close-up
+    // Background starfield & Milky Way band dim slightly on planetary close-up
     if (this.backgroundMat) {
       this.backgroundMat.uniforms.uTime.value = this.state.elapsedTime;
       this.backgroundMat.uniforms.uScale.value =
         0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
       if (this.backgroundMat.uniforms.uOpacity) {
-        this.backgroundMat.uniforms.uOpacity.value = t > 4.6 ? 0.55 : 0.95;
+        this.backgroundMat.uniforms.uOpacity.value = tEff > 4.6 ? 0.55 : 0.95;
       }
       if (this.backgroundStars) this.backgroundStars.visible = this.state.layers.stars;
     }
+    if (this.galaxySkyMat && this.galaxySkyMesh) {
+      const skyOp = tEff > 4.6 ? 0.52 : tEff > 2.8 ? 0.68 : 0.35;
+      this.galaxySkyMat.uniforms.uOpacity.value = skyOp;
+      this.galaxySkyMesh.visible = this.state.layers.stars;
+    }
 
-    // Nearest scale bookkeeping
-    const rounded = clamp(Math.round(t), 0, 6) as ScaleLevel;
+    // Crisp space contrast — atmosphere rims handle planetary horizons without washing out night sides
+    this.engine.scene.fog = null;
+
+    // Nearest scale bookkeeping (bounded by active portal)
+    const rounded = clamp(Math.round(tEff), 0, 6) as ScaleLevel;
     this.state.currentScale = rounded;
     if (rounded !== this.lightingScale) {
       this.lightingScale = rounded;
@@ -336,31 +442,84 @@ export class SceneManager {
     this.prevZoomT = t;
   }
 
+  private selectActivePlanet(pData: PlanetData): void {
+    if (pData.id === this.state.activePlanetId && this.planet.activePlanet?.id === pData.id) {
+      return;
+    }
+    this.state.activePlanetId = pData.id;
+    this.planet.setPlanet(pData);
+    this.refreshSlotFades();
+    eventBus.emit({
+      type: 'SCALE_CHANGE',
+      from: ScaleLevel.PLANET,
+      to: ScaleLevel.PLANET,
+    });
+  }
+
   private buildGlobalBackgroundStars(): void {
     const rand = mulberry32(10101);
-    const count = 5500;
+    const count = 7500;
     const spectral = ['#9bb8ff', '#cad8ff', '#f8f7ff', '#fff4ea', '#ffd2a1', '#ffcc6f'];
-    const data = buildStarData(count, () => {
-      const r = 1400 + rand() * 3200;
-      const theta = rand() * Math.PI * 2;
-      const phi = Math.acos(2 * rand() - 1);
+    // Tilt galactic star band ~32 deg (matching GALAXY_SKY_FRAGMENT)
+    const tilt = 0.56;
+    const cosT = Math.cos(tilt);
+    const sinT = Math.sin(tilt);
+
+    const data = buildStarData(count, (i) => {
+      const r = 1600 + rand() * 3000;
+      const inBand = i < count * 0.42;
+      let gx: number, gy: number, gz: number;
+
+      if (inBand) {
+        const theta = rand() * Math.PI * 2;
+        // Concentrate stars toward the galactic equator with slight core bias
+        const lat = gaussianRandom(rand) * 0.14;
+        const cosLat = Math.cos(lat);
+        gx = Math.cos(theta) * cosLat;
+        gy = Math.sin(lat);
+        gz = Math.sin(theta) * cosLat;
+      } else {
+        const theta = rand() * Math.PI * 2;
+        const phi = Math.acos(2 * rand() - 1);
+        gx = Math.sin(phi) * Math.cos(theta);
+        gy = Math.cos(phi);
+        gz = Math.sin(phi) * Math.sin(theta);
+      }
+
+      // Rotate by inverse tilt so band matches shader's g = tilt * d
+      const x = gx;
+      const y = gy * cosT + gz * sinT;
+      const z = -gy * sinT + gz * cosT;
+
       const hex = spectral[Math.floor(rand() * spectral.length)];
-      const col = new THREE.Color(hex).multiplyScalar(0.4 + rand() * 0.4);
+      const col = new THREE.Color(hex).multiplyScalar((inBand ? 0.45 : 0.38) + rand() * 0.45);
       return {
-        pos: [
-          r * Math.sin(phi) * Math.cos(theta),
-          r * Math.cos(phi),
-          r * Math.sin(phi) * Math.sin(theta),
-        ],
+        pos: [x * r, y * r, z * r],
         color: col,
-        size: 0.5 + rand() * 1.1,
+        size: inBand ? 0.42 + rand() * 0.95 : 0.5 + rand() * 1.15,
         seed: rand(),
       };
     });
-    const { points, material } = createStarPoints(data, 0.7);
+    const { points, material } = createStarPoints(data, 0.72);
     this.backgroundStars = points;
     this.backgroundMat = material;
     this.engine.scene.add(points);
+
+    // Subtle deep-space Milky Way band sky sphere
+    const skyGeo = new THREE.SphereGeometry(4800, 48, 48);
+    this.galaxySkyMat = new THREE.ShaderMaterial({
+      vertexShader: GALAXY_SKY_VERTEX,
+      fragmentShader: GALAXY_SKY_FRAGMENT,
+      uniforms: { uOpacity: { value: 0.55 } },
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.galaxySkyMesh = new THREE.Mesh(skyGeo, this.galaxySkyMat);
+    this.galaxySkyMesh.frustumCulled = false;
+    this.galaxySkyMesh.renderOrder = -10;
+    this.engine.scene.add(this.galaxySkyMesh);
   }
 
   /** Kept for compatibility — continuous blending now owns visibility. */
@@ -374,14 +533,15 @@ export class SceneManager {
   private updateLightingForScale(scale: ScaleLevel): void {
     if (scale === ScaleLevel.STAR_SYSTEM) {
       this.engine.sunLight.position.set(0, 0, 0);
-      this.engine.sunLight.intensity = 2.8;
-      this.engine.ambientLight.intensity = 0.6;
-      this.engine.fillLight.intensity = 0.28;
+      this.engine.sunLight.intensity = 3.0;
+      this.engine.ambientLight.intensity = 0.28;
+      this.engine.fillLight.intensity = 0.14;
     } else if (scale === ScaleLevel.PLANET || scale === ScaleLevel.SURFACE) {
-      this.engine.sunLight.position.set(45, 22, 35);
-      this.engine.sunLight.intensity = 2.6;
-      this.engine.ambientLight.intensity = 0.25;
-      this.engine.fillLight.intensity = 0.2;
+      // Sun remains at (0,0,0) so planets at their real orbital coordinates have natural day/night terminators
+      this.engine.sunLight.position.set(0, 0, 0);
+      this.engine.sunLight.intensity = 3.1;
+      this.engine.ambientLight.intensity = 0.16;
+      this.engine.fillLight.intensity = 0.08;
     } else {
       this.engine.sunLight.position.set(0, 0, 0);
       this.engine.sunLight.intensity = 1.4;
@@ -430,10 +590,45 @@ export class SceneManager {
     if (rebuilt) this.refreshSlotFades();
     this.state.currentScale = newScale;
 
+    // Sync portal gates with explicit scale navigation
+    this.enteredLocalGroup = newScale >= ScaleLevel.GALAXY_CLUSTER;
+    this.enteredMilkyWay = newScale >= ScaleLevel.GALAXY;
+    this.enteredStarSystem = newScale >= ScaleLevel.STAR_SYSTEM;
+    this.enteredPlanet = newScale >= ScaleLevel.PLANET;
+    this.prevGalaxyAnchorQ = this.enteredStarSystem ? 1 : 0;
+    if (!this.enteredPlanet) {
+      this.cameraCtrl?.releaseTracking();
+    }
+
     // Same-scale data change (e.g. switching planet) -> refresh UI now.
     // Cross-scale changes are reported by the zoom detector as you fly.
     if (newScale === this.reportedScale) {
       eventBus.emit({ type: 'SCALE_CHANGE', from: newScale, to: newScale });
+    }
+  }
+
+  /** Fly smoothly to any planet at its live orbital position and lock tracking onto it. */
+  public flyToPlanet(systemId: string, planetId: string, duration = 1.35): void {
+    this.transitionToScale(ScaleLevel.PLANET, { systemId, planetId });
+    if (!this.cameraCtrl) return;
+    const item = this.starSystem.planets.find((p) => p.data.id === planetId);
+    const targetRadius = item?.data.hasRings ? 10.5 : 8.8;
+    if (item) {
+      const pos = new THREE.Vector3();
+      item.group.getWorldPosition(pos);
+      this.cameraCtrl.animateTo(
+        0.85,
+        1.18,
+        targetRadius,
+        pos,
+        duration,
+        () => {
+          this.cameraCtrl?.trackObject(item.group, false);
+        },
+        item.group
+      );
+    } else {
+      this.cameraCtrl.animateTo(0.85, 1.18, targetRadius, [0, 0, 0], duration);
     }
   }
 
@@ -442,7 +637,7 @@ export class SceneManager {
     clientX: number,
     clientY: number
   ): { type: string; id: string; systemId?: string; position?: THREE.Vector3 } | null {
-    const scale = clamp(Math.round(this.state.zoomLevel), 0, 6) as ScaleLevel;
+    const scale = this.state.currentScale;
     let targets: THREE.Object3D[] = [];
 
     if (scale === ScaleLevel.OBSERVABLE_UNIVERSE) targets = this.observableUniverse.pickTargets;
@@ -474,14 +669,13 @@ export class SceneManager {
     };
   }
 
-  public update(dt: number, state: AppState): void {
+  public update(dt: number, _state: AppState): void {
     this.updateContinuousZoom(dt);
+    // Keep gated night-light materials, cloud shadows, and sun-aware atmospheres pointed
+    // at the sun (world space) AFTER layer/planet positions update for this frame.
+    updateNightTerminators(this.engine.sunLight.position);
+    updateSunDirections(this.engine.sunLight.position);
   }
-}
-
-function GLOBAL_MIN_HELPER(t: number): number {
-  // Allow close approach to black holes / galactic core, but not inside stars
-  return t > 3.55 && t < 4.55 ? 3.2 : 2.0;
 }
 
 export { GALAXIES };

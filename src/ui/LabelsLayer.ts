@@ -67,11 +67,7 @@ export class LabelsLayer {
       this.sceneManager.starSystem.planets.forEach((p) => {
         const isSpecial = p.data.id === 'earth' || p.data.id === 'proxima_b' || p.data.id === 't1_e' || p.data.id === 'k_f';
         this.addPin(p.data.id, p.data.shortNameBn, p.data.color, p.group.position, isSpecial, () => {
-          this.sceneManager.transitionToScale(ScaleLevel.PLANET, {
-            systemId: this.sceneManager.starSystem.activeSystemId,
-            planetId: p.data.id,
-          });
-          this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
+          this.sceneManager.flyToPlanet(this.sceneManager.starSystem.activeSystemId, p.data.id);
         });
       });
     }

@@ -14,6 +14,8 @@ import {
   GLOW_FRAGMENT,
   NEBULA_VERTEX,
   NEBULA_FRAGMENT,
+  ORBIT_VERTEX,
+  ORBIT_FRAGMENT,
 } from '../render/shaders';
 import { TextureFactory } from '../render/TextureFactory';
 
@@ -148,18 +150,27 @@ export function createOrbitLine(
   radius: number,
   color: string,
   opacity: number,
-  segments = 160
+  segments = 192,
+  headAngle = 0
 ): THREE.LineLoop {
   const pts: THREE.Vector3[] = [];
+  const angles = new Float32Array(segments);
   for (let i = 0; i < segments; i++) {
     const a = (i / segments) * Math.PI * 2;
     pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+    angles[i] = a;
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const mat = new THREE.LineBasicMaterial({
-    color: new THREE.Color(color),
+  geo.setAttribute('aAngle', new THREE.BufferAttribute(angles, 1));
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: ORBIT_VERTEX,
+    fragmentShader: ORBIT_FRAGMENT,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uOpacity: { value: opacity },
+      uHeadAngle: { value: headAngle },
+    },
     transparent: true,
-    opacity,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -172,7 +183,7 @@ export function createRingMesh(
   inner: number,
   outer: number,
   tint: string,
-  sunDir: THREE.Vector3,
+  planetRadius: number,
   texture?: THREE.Texture
 ): { mesh: THREE.Mesh; material: THREE.ShaderMaterial } {
   const geo = new THREE.RingGeometry(inner, outer, 160, 1);
@@ -189,9 +200,10 @@ export function createRingMesh(
     fragmentShader: RING_FRAGMENT,
     uniforms: {
       uMap: { value: texture || TextureFactory.getRingTexture() },
-      uSunDir: { value: sunDir.clone().normalize() },
+      uSunDir: { value: new THREE.Vector3(0, 0, 1) },
       uTint: { value: new THREE.Color(tint) },
       uOpacity: { value: 1 },
+      uPlanetRadius: { value: planetRadius },
     },
     transparent: true,
     side: THREE.DoubleSide,
@@ -199,6 +211,9 @@ export function createRingMesh(
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
+  // Local-space sun direction: the planet sits at the ring's local origin,
+  // so the shadow test in the shader stays exact under any transform.
+  trackSunDirection(material, 'uSunDir', mesh, true);
   return { mesh, material };
 }
 
@@ -218,6 +233,7 @@ export function createAtmosphere(
       uPower: { value: power },
       uHDR: { value: 1.1 },
       uOpacity: { value: 1 },
+      uSunDir: { value: new THREE.Vector3(0, 0, 1) },
     },
     transparent: true,
     side: THREE.BackSide,
@@ -226,7 +242,121 @@ export function createAtmosphere(
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
+  // Sun-aware scattering needs the world-space sun direction every frame.
+  trackSunDirection(material, 'uSunDir', mesh);
   return { mesh, material };
+}
+
+// ------------------------------------------------------------------
+// Generic world-space sun-direction tracking for ShaderMaterials.
+// Registers a material + target object; updateSunDirections() recomputes
+// (sun - target) each frame. Dead targets (layer rebuilt) self-remove.
+// ------------------------------------------------------------------
+interface SunTrackedEntry {
+  target: THREE.Object3D;
+  refs: Array<{ ref: { value: THREE.Vector3 }; local: boolean }>;
+}
+
+const sunDirectionRegistry = new Map<THREE.Material, SunTrackedEntry>();
+
+function registerSunRef(
+  material: THREE.Material,
+  target: THREE.Object3D,
+  ref: { value: THREE.Vector3 },
+  local: boolean
+): void {
+  let entry = sunDirectionRegistry.get(material);
+  if (!entry) {
+    entry = { target, refs: [] };
+    sunDirectionRegistry.set(material, entry);
+  }
+  entry.target = target;
+  entry.refs.push({ ref, local });
+}
+
+export function trackSunDirection(
+  material: THREE.Material,
+  uniformName: string,
+  target: THREE.Object3D,
+  local = false
+): void {
+  const mats = material as THREE.ShaderMaterial;
+  if (!mats.uniforms || !mats.uniforms[uniformName]) return;
+  const ref = { value: new THREE.Vector3(0, 0, 1) };
+  mats.uniforms[uniformName] = ref as THREE.IUniform;
+  registerSunRef(material, target, ref, local);
+}
+
+const _sunTrackPos = new THREE.Vector3();
+const _sunTrackDir = new THREE.Vector3();
+const _sunTrackLocal = new THREE.Vector3();
+export function updateSunDirections(sunWorldPos: THREE.Vector3): void {
+  sunDirectionRegistry.forEach((entry, mat) => {
+    if (!entry.target.parent) {
+      sunDirectionRegistry.delete(mat);
+      return;
+    }
+    entry.target.getWorldPosition(_sunTrackPos);
+    _sunTrackDir.copy(sunWorldPos).sub(_sunTrackPos);
+    if (_sunTrackDir.lengthSq() < 1e-8) _sunTrackDir.set(0, 0, 1);
+    _sunTrackDir.normalize();
+    for (const { ref, local } of entry.refs) {
+      if (local) {
+        // Sun direction expressed in the target's local space
+        // (e.g. ring shader whose planet sits at the local origin).
+        _sunTrackLocal.copy(sunWorldPos);
+        entry.target.worldToLocal(_sunTrackLocal);
+        if (_sunTrackLocal.lengthSq() < 1e-8) _sunTrackLocal.set(0, 0, 1);
+        ref.value.copy(_sunTrackLocal.normalize());
+      } else {
+        ref.value.copy(_sunTrackDir);
+      }
+    }
+  });
+}
+
+// ------------------------------------------------------------------
+// Day/night fade for cloud layers.
+// Standard lighting already shades clouds, but ambient/fill light leaves
+// the night side washed gray. This patch scales the cloud diffuse by the
+// sun-facing factor (soft terminator), keeping a faint minimum so the
+// night side doesn't clip unnaturally.
+// ------------------------------------------------------------------
+export function enableCloudNightFade(
+  material: THREE.MeshStandardMaterial,
+  target: THREE.Object3D
+): void {
+  const ref = { value: new THREE.Vector3(0, 0, 1) };
+  registerSunRef(material, target, ref, false);
+
+  material.onBeforeCompile = (shader) => {
+    (shader.uniforms as Record<string, THREE.IUniform>).uCloudSunDir = ref;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec3 vCloudWorldNormal;'
+      )
+      .replace(
+        '#include <fog_vertex>',
+        '#include <fog_vertex>\nvCloudWorldNormal = normalize(mat3(modelMatrix) * objectNormal);'
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 uCloudSunDir;\nvarying vec3 vCloudWorldNormal;'
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        {
+          float cloudNdl = dot(normalize(vCloudWorldNormal), normalize(uCloudSunDir));
+          float cloudDay = smoothstep(-0.28, 0.42, cloudNdl);
+          diffuseColor.rgb *= (0.10 + 0.90 * cloudDay);
+        }`
+      );
+  };
+  material.customProgramCacheKey = () => 'cloud-night-v1';
+  material.needsUpdate = true;
 }
 
 /** Recursively dispose geometries, materials and textures. */
@@ -271,4 +401,229 @@ export function buildStarData(
     seeds[i] = d.seed;
   }
   return { positions, colors, sizes, seeds };
+}
+
+// ------------------------------------------------------------------
+// Unified planet surface effects (onBeforeCompile):
+//   1. Day/night terminator gating for emissive city lights.
+//   2. Ray-projected moving cloud shadows cast onto the terrain/ocean.
+// Consolidated into one hook so they never overwrite each other.
+// ------------------------------------------------------------------
+let _dummyBlackTex: THREE.DataTexture | null = null;
+function getDummyBlackTexture(): THREE.DataTexture {
+  if (!_dummyBlackTex) {
+    _dummyBlackTex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+    _dummyBlackTex.needsUpdate = true;
+  }
+  return _dummyBlackTex;
+}
+
+export interface PlanetSurfaceEffectsOptions {
+  nightLights?: boolean;
+  cloudMap?: THREE.Texture | null;
+  cloudMesh?: THREE.Object3D | null;
+  cloudRadiusRatio?: number;
+  microDetail?: boolean;
+}
+
+interface PlanetSurfaceEntry {
+  target: THREE.Object3D;
+  cloudMesh: THREE.Object3D | null;
+  sunWorld: { value: THREE.Vector3 };
+  sunLocal: { value: THREE.Vector3 };
+  cloudShadowMap: { value: THREE.Texture };
+  hasCloudShadow: { value: number };
+  cloudDeltaYaw: { value: number };
+  cloudShellRatio: { value: number };
+  nightLightsEnabled: { value: number };
+  microDetailEnabled: { value: number };
+}
+
+const planetSurfaceRegistry = new Map<THREE.MeshStandardMaterial, PlanetSurfaceEntry>();
+
+export function enablePlanetSurfaceEffects(
+  material: THREE.MeshStandardMaterial,
+  target: THREE.Object3D,
+  options: PlanetSurfaceEffectsOptions = {}
+): void {
+  const existing = planetSurfaceRegistry.get(material);
+  if (existing) {
+    if (options.nightLights !== undefined) {
+      existing.nightLightsEnabled.value = options.nightLights ? 1 : 0;
+    }
+    if (options.cloudMap) {
+      existing.cloudShadowMap.value = options.cloudMap;
+      existing.hasCloudShadow.value = 1;
+    }
+    if (options.cloudMesh !== undefined) {
+      existing.cloudMesh = options.cloudMesh;
+    }
+    if (options.cloudRadiusRatio !== undefined) {
+      existing.cloudShellRatio.value = options.cloudRadiusRatio;
+    }
+    if (options.microDetail !== undefined) {
+      existing.microDetailEnabled.value = options.microDetail ? 1 : 0;
+    }
+    return;
+  }
+
+  const entry: PlanetSurfaceEntry = {
+    target,
+    cloudMesh: options.cloudMesh ?? null,
+    sunWorld: { value: new THREE.Vector3(0, 0, 1) },
+    sunLocal: { value: new THREE.Vector3(0, 0, 1) },
+    cloudShadowMap: { value: options.cloudMap ?? getDummyBlackTexture() },
+    hasCloudShadow: { value: options.cloudMap ? 1 : 0 },
+    cloudDeltaYaw: { value: 0 },
+    cloudShellRatio: { value: options.cloudRadiusRatio ?? 1.018 },
+    nightLightsEnabled: { value: options.nightLights ? 1 : 0 },
+    microDetailEnabled: { value: options.microDetail ? 1 : 0 },
+  };
+  planetSurfaceRegistry.set(material, entry);
+
+  material.onBeforeCompile = (shader) => {
+    const u = shader.uniforms as Record<string, THREE.IUniform>;
+    u.uPlanetSunWorld = entry.sunWorld;
+    u.uPlanetSunLocal = entry.sunLocal;
+    u.uCloudShadowMap = entry.cloudShadowMap;
+    u.uHasCloudShadow = entry.hasCloudShadow;
+    u.uCloudDeltaYaw = entry.cloudDeltaYaw;
+    u.uCloudShellRatio = entry.cloudShellRatio;
+    u.uNightLightsEnabled = entry.nightLightsEnabled;
+    u.uMicroDetailEnabled = entry.microDetailEnabled;
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec3 vPlanetWorldNormal;\nvarying vec3 vPlanetLocalPos;'
+      )
+      .replace(
+        '#include <fog_vertex>',
+        '#include <fog_vertex>\nvPlanetWorldNormal = normalize(mat3(modelMatrix) * objectNormal);\nvPlanetLocalPos = position;'
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform vec3 uPlanetSunWorld;
+        uniform vec3 uPlanetSunLocal;
+        uniform sampler2D uCloudShadowMap;
+        uniform float uHasCloudShadow;
+        uniform float uCloudDeltaYaw;
+        uniform float uCloudShellRatio;
+        uniform float uNightLightsEnabled;
+        uniform float uMicroDetailEnabled;
+        varying vec3 vPlanetWorldNormal;
+        varying vec3 vPlanetLocalPos;
+
+        float planetMicroHash(vec3 p) {
+          p = fract(p * 0.3183099 + 0.1);
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+
+        float planetMicroNoise(vec3 x) {
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(mix(planetMicroHash(i + vec3(0.0,0.0,0.0)), planetMicroHash(i + vec3(1.0,0.0,0.0)), f.x),
+                mix(planetMicroHash(i + vec3(0.0,1.0,0.0)), planetMicroHash(i + vec3(1.0,1.0,0.0)), f.x), f.y),
+            mix(mix(planetMicroHash(i + vec3(0.0,0.0,1.0)), planetMicroHash(i + vec3(1.0,0.0,1.0)), f.x),
+                mix(planetMicroHash(i + vec3(0.0,1.0,1.0)), planetMicroHash(i + vec3(1.0,1.0,1.0)), f.x), f.y),
+            f.z
+          );
+        }`
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        if (uMicroDetailEnabled > 0.5) {
+          vec3 mp = normalize(vPlanetLocalPos);
+          float m1 = planetMicroNoise(mp * 36.0);
+          float m2 = planetMicroNoise(mp * 92.0);
+          float micro = 0.93 + 0.14 * (m1 * 0.6 + m2 * 0.4);
+          diffuseColor.rgb *= micro;
+        }`
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        if (uNightLightsEnabled > 0.5) {
+          float nightNdl = dot(normalize(vPlanetWorldNormal), normalize(uPlanetSunWorld));
+          float nightFactor = 1.0 - smoothstep(-0.14, 0.24, nightNdl);
+          totalEmissiveRadiance *= nightFactor;
+        }`
+      )
+      .replace(
+        '#include <lights_fragment_end>',
+        `#include <lights_fragment_end>
+        if (uHasCloudShadow > 0.5) {
+          vec3 pUnit = normalize(vPlanetLocalPos);
+          vec3 lLocal = normalize(uPlanetSunLocal);
+          float b = dot(pUnit, lLocal);
+          if (b > -0.08) {
+            float k = uCloudShellRatio;
+            float disc = b * b + (k * k - 1.0);
+            float tHit = -b + sqrt(max(0.0, disc));
+            vec3 qUnit = normalize(pUnit + lLocal * tHit);
+            float phi = atan(qUnit.z, -qUnit.x) - uCloudDeltaYaw;
+            float uC = fract(phi / 6.28318530718);
+            float vC = 1.0 - acos(clamp(qUnit.y, -1.0, 1.0)) / 3.14159265359;
+            vec4 cSample = texture2D(uCloudShadowMap, vec2(uC, vC));
+            float cDensity = clamp(min(cSample.a, dot(cSample.rgb, vec3(0.3333))), 0.0, 1.0);
+            float dayFade = smoothstep(-0.08, 0.16, b);
+            float cloudShadow = 1.0 - cDensity * 0.54 * dayFade;
+            reflectedLight.directDiffuse *= cloudShadow;
+            reflectedLight.directSpecular *= cloudShadow;
+          }
+        }`
+      );
+  };
+  material.customProgramCacheKey = () => 'planet-surface-v3';
+  material.needsUpdate = true;
+}
+
+export function updatePlanetCloudShadowMap(
+  material: THREE.MeshStandardMaterial,
+  cloudTex: THREE.Texture
+): void {
+  const entry = planetSurfaceRegistry.get(material);
+  if (!entry) return;
+  entry.cloudShadowMap.value = cloudTex;
+  entry.hasCloudShadow.value = 1;
+}
+
+export function enableNightTerminator(
+  material: THREE.MeshStandardMaterial,
+  target: THREE.Object3D
+): void {
+  enablePlanetSurfaceEffects(material, target, { nightLights: true });
+}
+
+/** Recompute sun direction & cloud shadow delta yaw for every planet material. */
+const _nightSunTmp = new THREE.Vector3();
+const _nightTargetTmp = new THREE.Vector3();
+const _localSunTmp = new THREE.Vector3();
+export function updateNightTerminators(sunWorldPos: THREE.Vector3): void {
+  planetSurfaceRegistry.forEach((entry, mat) => {
+    if (!entry.target.parent) {
+      planetSurfaceRegistry.delete(mat);
+      return;
+    }
+    entry.target.getWorldPosition(_nightTargetTmp);
+    _nightSunTmp.copy(sunWorldPos).sub(_nightTargetTmp);
+    if (_nightSunTmp.lengthSq() < 1e-8) _nightSunTmp.set(0, 0, 1);
+    entry.sunWorld.value.copy(_nightSunTmp.normalize());
+
+    _localSunTmp.copy(sunWorldPos);
+    entry.target.worldToLocal(_localSunTmp);
+    if (_localSunTmp.lengthSq() < 1e-8) _localSunTmp.set(0, 0, 1);
+    entry.sunLocal.value.copy(_localSunTmp.normalize());
+
+    if (entry.cloudMesh && entry.cloudMesh.parent) {
+      entry.cloudDeltaYaw.value = entry.cloudMesh.rotation.y - entry.target.rotation.y;
+    }
+  });
 }

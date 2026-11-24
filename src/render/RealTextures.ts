@@ -41,12 +41,96 @@ const DEFINITIONS: Record<string, { map: string; bump?: string; normal?: string;
   sun_yellow: { map: `${THREEX_TEX}/sunmap.jpg` },
 };
 
+const RING_DEFINITIONS: Record<'saturn' | 'uranus', { color: string; pattern?: string }> = {
+  saturn: {
+    color: `${THREEX_TEX}/saturnringcolor.jpg`,
+    pattern: `${THREEX_TEX}/saturnringpattern.gif`,
+  },
+  uranus: {
+    color: `${THREEX_TEX}/uranusringcolour.jpg`,
+  },
+};
+
 const loader = new THREE.TextureLoader();
 loader.setCrossOrigin('anonymous');
 
 const cache = new Map<string, RealSet>();
 const pending = new Map<string, Promise<RealSet>>();
 const subscribers = new Map<string, Set<(set: RealSet) => void>>();
+
+const ringCache = new Map<'saturn' | 'uranus', THREE.Texture>();
+const ringPending = new Map<'saturn' | 'uranus', Promise<THREE.Texture | null>>();
+const ringSubscribers = new Map<'saturn' | 'uranus', Set<(tex: THREE.Texture) => void>>();
+
+function buildRingTexture(
+  colorTex: THREE.Texture,
+  patternTex?: THREE.Texture
+): THREE.CanvasTexture | undefined {
+  const cImg = colorTex.image as HTMLImageElement | undefined;
+  if (!cImg || !cImg.width) return undefined;
+  try {
+    const w = cImg.width;
+    const h = Math.max(1, cImg.height);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(cImg, 0, 0, w, h);
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+
+    let patData: Uint8ClampedArray | null = null;
+    if (patternTex) {
+      const pImg = patternTex.image as HTMLImageElement | undefined;
+      if (pImg && pImg.width) {
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = w;
+        pCanvas.height = h;
+        const pCtx = pCanvas.getContext('2d')!;
+        pCtx.drawImage(pImg, 0, 0, w, h);
+        patData = pCtx.getImageData(0, 0, w, h).data;
+      }
+    }
+
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+      if (patData) {
+        // threex saturnringpattern.gif encodes opacity as luminance (bright = dense ice, dark = Cassini/Encke gap)
+        const pLum = (patData[i] * 0.299 + patData[i + 1] * 0.587 + patData[i + 2] * 0.114) / 255;
+        d[i + 3] = Math.round(Math.min(1, pLum * 1.15) * 255);
+      } else {
+        // Uranus rings: faint icy dust bands over black background
+        const alpha = Math.max(0, Math.min(1, (lum - 0.04) * 1.9));
+        d[i + 3] = Math.round(alpha * 210);
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const out = new THREE.CanvasTexture(canvas);
+    out.colorSpace = THREE.SRGBColorSpace;
+    out.wrapS = THREE.ClampToEdgeWrapping;
+    out.wrapT = THREE.ClampToEdgeWrapping;
+    out.anisotropy = 8;
+    out.needsUpdate = true;
+    return out;
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadRingTex(kind: 'saturn' | 'uranus'): Promise<THREE.Texture | null> {
+  const def = RING_DEFINITIONS[kind];
+  if (!def) return null;
+  try {
+    const colorPromise = loadTex(def.color, true);
+    const patternPromise = def.pattern ? loadTex(def.pattern, false).catch(() => undefined) : Promise.resolve(undefined);
+    const [colorTex, patternTex] = await Promise.all([colorPromise, patternPromise]);
+    return buildRingTexture(colorTex, patternTex) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 function loadTex(url: string, srgb: boolean): Promise<THREE.Texture> {
   return new Promise((resolve, reject) => {
@@ -178,16 +262,20 @@ export class RealTextures {
   public static applyToMaterial(
     type: string,
     material: THREE.MeshStandardMaterial,
-    options: { clouds?: boolean } = {}
+    _options: { clouds?: boolean } = {}
   ): void {
     this.whenReady(type, (set) => {
       if (set.map) material.map = set.map;
       if (set.normalMap) {
         material.normalMap = set.normalMap;
-        material.normalScale = new THREE.Vector2(0.9, 0.9);
+        material.normalScale = new THREE.Vector2(0.85, 0.85);
         material.bumpMap = null;
       } else if (set.bumpMap) {
         material.bumpMap = set.bumpMap;
+      } else {
+        // Gas/ice giants have smooth cloud decks — don't leave procedural rocky bumps on top of NASA maps.
+        material.bumpMap = null;
+        material.bumpScale = 0;
       }
       if (set.roughnessMap) material.roughnessMap = set.roughnessMap;
       if (set.nightMap) {
@@ -200,18 +288,65 @@ export class RealTextures {
   }
 
   /** Apply a real cloud map to a cloud-layer material. */
-  public static applyClouds(type: string, material: THREE.MeshStandardMaterial): void {
+  public static applyClouds(
+    type: string,
+    material: THREE.MeshStandardMaterial,
+    onLoaded?: (tex: THREE.Texture) => void
+  ): void {
     this.whenReady(type, (set) => {
       if (!set.cloudMap) return;
       material.map = set.cloudMap;
       material.alphaMap = set.cloudMap;
       material.transparent = true;
       material.needsUpdate = true;
+      onLoaded?.(set.cloudMap);
     });
   }
 
-  /** Preload the most important bodies so first zoom is already photographic. */
+  /** Stream and apply real NASA/Cassini planetary ring maps to a ring ShaderMaterial. */
+  public static applyToRingMaterial(
+    kind: 'saturn' | 'uranus',
+    material: THREE.ShaderMaterial
+  ): void {
+    const hit = ringCache.get(kind);
+    if (hit) {
+      if (material.uniforms?.uMap) {
+        material.uniforms.uMap.value = hit;
+      }
+      return;
+    }
+    if (!ringSubscribers.has(kind)) ringSubscribers.set(kind, new Set());
+    ringSubscribers.get(kind)!.add((tex) => {
+      if (material.uniforms?.uMap) {
+        material.uniforms.uMap.value = tex;
+      }
+    });
+    if (!ringPending.has(kind)) {
+      const p = loadRingTex(kind).then((tex) => {
+        if (tex) {
+          ringCache.set(kind, tex);
+          ringSubscribers.get(kind)?.forEach((cb) => cb(tex));
+        }
+        ringSubscribers.delete(kind);
+        return tex;
+      });
+      ringPending.set(kind, p);
+    }
+  }
+
+  /** Preload core planetary maps so zooming into any world is photographic immediately. */
   public static preloadCore(): void {
-    ['earth', 'moon', 'mars', 'jupiter', 'saturn', 'sun_yellow'].forEach((t) => this.get(t));
+    ['earth', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'sun_yellow'].forEach(
+      (t) => this.get(t)
+    );
+    (['saturn', 'uranus'] as const).forEach((kind) => {
+      if (!ringPending.has(kind)) {
+        const p = loadRingTex(kind).then((tex) => {
+          if (tex) ringCache.set(kind, tex);
+          return tex;
+        });
+        ringPending.set(kind, p);
+      }
+    });
   }
 }

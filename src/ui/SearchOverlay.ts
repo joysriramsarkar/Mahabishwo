@@ -143,11 +143,7 @@ export class SearchOverlay {
         break;
       }
       case ScaleLevel.PLANET:
-        this.sceneManager.transitionToScale(ScaleLevel.PLANET, {
-          systemId: item.systemId || 'solar',
-          planetId: item.planetId || 'earth',
-        });
-        this.cameraCtrl.animateTo(0.85, 1.2, 8.5, [0, 0, 0]);
+        this.sceneManager.flyToPlanet(item.systemId || 'solar', item.planetId || 'earth');
         break;
     }
   }

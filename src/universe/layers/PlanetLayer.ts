@@ -8,7 +8,14 @@ import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
-import { createAtmosphere, createRingMesh, disposeObject } from '../helpers';
+import {
+  createAtmosphere,
+  createRingMesh,
+  disposeObject,
+  enablePlanetSurfaceEffects,
+  updatePlanetCloudShadowMap,
+  enableCloudNightFade,
+} from '../helpers';
 
 export class PlanetLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -47,18 +54,24 @@ export class PlanetLayer implements SceneLayer {
 
     // 1. Planet sphere
     const tex = TextureFactory.getPlanetTextures(p.textureType, 1536, 768);
+    const isGasOrIce =
+      p.textureType === 'jupiter' ||
+      p.textureType === 'saturn' ||
+      p.textureType === 'uranus' ||
+      p.textureType === 'neptune' ||
+      p.textureType === 'venus';
     const mat = new THREE.MeshStandardMaterial({
       map: tex.map,
-      bumpMap: tex.bumpMap ?? null,
-      bumpScale: 0.08,
+      bumpMap: isGasOrIce ? null : (tex.bumpMap ?? null),
+      bumpScale: isGasOrIce ? 0 : 0.015,
       roughnessMap: tex.roughnessMap ?? null,
-      roughness: 0.85,
-      metalness: 0.04,
+      roughness: isGasOrIce ? 0.72 : 0.86,
+      metalness: 0.02,
       emissive: tex.nightMap ? new THREE.Color('#ffd97d') : new THREE.Color('#000000'),
       emissiveMap: tex.nightMap ?? null,
-      emissiveIntensity: tex.nightMap ? 0.65 : 0,
+      emissiveIntensity: tex.nightMap ? 0.75 : 0,
     });
-    this.planetMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 96), mat);
+    this.planetMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 128), mat);
     this.planetMesh.rotation.z = p.tilt || 0;
     this.group.add(this.planetMesh);
     // Upgrade to the real photographic planetary map when downloaded
@@ -73,11 +86,26 @@ export class PlanetLayer implements SceneLayer {
         roughness: 0.92,
         depthWrite: false,
       });
-      this.cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 1.018, 96, 96), cMat);
+      this.cloudsMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 1.018, 128, 128), cMat);
       this.cloudsMesh.rotation.z = p.tilt || 0;
       this.group.add(this.cloudsMesh);
-      if (p.textureType === 'earth') RealTextures.applyClouds('earth', cMat);
+      // Night-side clouds fade out instead of glowing gray from ambient light.
+      enableCloudNightFade(cMat, this.cloudsMesh);
+      if (p.textureType === 'earth') {
+        RealTextures.applyClouds('earth', cMat, (cloudTex) => {
+          updatePlanetCloudShadowMap(mat, cloudTex);
+        });
+      }
     }
+
+    // Unified surface effects: night-side city lights terminator, moving cloud shadows, and crisp micro-relief
+    enablePlanetSurfaceEffects(mat, this.planetMesh, {
+      nightLights: !!tex.nightMap,
+      cloudMap: p.hasClouds ? tex.cloudMap ?? null : null,
+      cloudMesh: this.cloudsMesh,
+      cloudRadiusRatio: 1.018,
+      microDetail: !isGasOrIce,
+    });
 
     // 3. Atmosphere Fresnel rim (dual-shell)
     if (p.atmosphereColor) {
@@ -121,12 +149,13 @@ export class PlanetLayer implements SceneLayer {
         inner,
         outer,
         p.hasRings ? '#f5e6c4' : '#93c5fd',
-        new THREE.Vector3(40, 25, 30),
+        R,
         TextureFactory.getRingTexture(p.hasRings ? 7 : 13, 1024, 16)
       );
       ring.mesh.rotation.x = Math.PI / 2;
       ring.mesh.rotation.y = p.tilt || 0.42;
       this.group.add(ring.mesh);
+      RealTextures.applyToRingMaterial(p.hasRings ? 'saturn' : 'uranus', ring.material);
     }
   }
 
