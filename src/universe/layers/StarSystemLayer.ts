@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { AppState, SceneLayer, PlanetData } from '../../core/types';
-import { STAR_SYSTEMS_CATALOG, ORBIT_PERIOD_DAYS } from '../../data/cosmicData';
+import { STAR_SYSTEMS_CATALOG, ORBIT_PERIOD_DAYS, ORBIT_ECCENTRICITY } from '../../data/cosmicData';
 import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
@@ -31,9 +31,20 @@ export interface ActivePlanetItem {
   cloudsMesh: THREE.Mesh | null;
   moonPivot: THREE.Group | null;
   orbitMaterial: THREE.ShaderMaterial;
+  /** Mean anomaly (advances uniformly — Kepler's second law gives variable orbital speed). */
   angle: number;
   /** Physically-derived angular velocity (rad/s) from the real orbital period. */
   angularSpeed: number;
+  eccentricity: number;
+}
+
+/** Solve Kepler's equation M = E - e·sin(E) for the eccentric anomaly. */
+function solveEccentricAnomaly(M: number, e: number): number {
+  let E = e < 0.8 ? M : Math.PI;
+  for (let i = 0; i < 4; i++) {
+    E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  }
+  return E;
 }
 
 /** Visual seconds for one orbit of the fastest planet in each system. */
@@ -210,20 +221,23 @@ export class StarSystemLayer implements SceneLayer {
         pData.id === 'k_f';
 
       const startAngle = idx * 1.15 + 0.6;
+      const ecc = ORBIT_ECCENTRICITY[pData.id] ?? 0;
       const orbitLine = createOrbitLine(
         pData.orbitRadius,
         isHabitable ? '#38bdf8' : '#64748b',
         isHabitable ? 0.55 : 0.25,
         192,
-        startAngle
+        startAngle,
+        ecc
       );
       this.orbitLinesGroup.add(orbitLine);
 
+      const startE = solveEccentricAnomaly(startAngle, ecc);
       const planetGroup = new THREE.Group();
       planetGroup.position.set(
-        Math.cos(startAngle) * pData.orbitRadius,
+        Math.cos(startE) * pData.orbitRadius - pData.orbitRadius * ecc,
         0,
-        Math.sin(startAngle) * pData.orbitRadius
+        Math.sin(startE) * pData.orbitRadius * Math.sqrt(1 - ecc * ecc)
       );
       this.group.add(planetGroup);
 
@@ -342,6 +356,7 @@ export class StarSystemLayer implements SceneLayer {
         angle: startAngle,
         angularSpeed:
           ((Math.PI * 2) / VISUAL_ORBIT_SECONDS) * (referencePeriod / periods[idx]),
+        eccentricity: ecc,
       });
     });
   }
@@ -391,11 +406,15 @@ export class StarSystemLayer implements SceneLayer {
 
     this.planets.forEach((p) => {
       if (state.isPlaying && state.rotationSpeed > 0) {
+        // Mean anomaly grows uniformly; solving Kepler's equation makes the
+        // planet move faster near perihelion and slower near aphelion.
         p.angle += dt * p.angularSpeed * state.rotationSpeed;
+        const E = solveEccentricAnomaly(p.angle, p.eccentricity);
+        const a = p.data.orbitRadius;
         p.group.position.set(
-          Math.cos(p.angle) * p.data.orbitRadius,
+          Math.cos(E) * a - a * p.eccentricity,
           0,
-          Math.sin(p.angle) * p.data.orbitRadius
+          Math.sin(E) * a * Math.sqrt(1 - p.eccentricity * p.eccentricity)
         );
         // Axial spin and cloud drift are deliberately gentle — real rotation
         // would be a blur at this scale; keep them well below orbital motion.
@@ -407,7 +426,7 @@ export class StarSystemLayer implements SceneLayer {
           // Moon: ~27 days vs Earth's ~365 days, but softened for readability.
           p.moonPivot.rotation.y += dt * 0.14 * state.rotationSpeed;
         }
-        p.orbitMaterial.uniforms.uHeadAngle.value = p.angle;
+        p.orbitMaterial.uniforms.uHeadAngle.value = E;
       }
     });
 

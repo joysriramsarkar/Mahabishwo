@@ -32,6 +32,24 @@ export const ORBIT_PERIOD_DAYS: Record<string, number> = {
   k_f: 129.9,
 };
 
+/** Real orbital eccentricities (NASA / JPL). Zero for poorly-constrained exoplanets. */
+export const ORBIT_ECCENTRICITY: Record<string, number> = {
+  mercury: 0.2056,
+  venus: 0.0068,
+  earth: 0.0167,
+  mars: 0.0934,
+  jupiter: 0.0489,
+  saturn: 0.0565,
+  uranus: 0.0457,
+  neptune: 0.0113,
+  proxima_d: 0.0,
+  proxima_b: 0.11,
+  t1_b: 0.0,
+  t1_e: 0.0,
+  t1_f: 0.0,
+  k_f: 0.0,
+};
+
 export const SUPERCLUSTERS: SuperclusterData[] = [
   {
     id: 'laniakea',

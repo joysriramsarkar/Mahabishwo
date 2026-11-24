@@ -18,6 +18,7 @@ import {
   ORBIT_FRAGMENT,
 } from '../render/shaders';
 import { TextureFactory } from '../render/TextureFactory';
+import { clamp } from '../utils/math';
 
 export interface StarPointData {
   positions: Float32Array;
@@ -151,13 +152,17 @@ export function createOrbitLine(
   color: string,
   opacity: number,
   segments = 192,
-  headAngle = 0
+  headAngle = 0,
+  eccentricity = 0
 ): THREE.LineLoop {
   const pts: THREE.Vector3[] = [];
   const angles = new Float32Array(segments);
+  const e = clamp(eccentricity, 0, 0.85);
+  const b = radius * Math.sqrt(1 - e * e);
   for (let i = 0; i < segments; i++) {
     const a = (i / segments) * Math.PI * 2;
-    pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+    // Focus (the host star) sits at the origin: perihelion at +X, aphelion at -X.
+    pts.push(new THREE.Vector3(Math.cos(a) * radius - radius * e, 0, Math.sin(a) * b));
     angles[i] = a;
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);

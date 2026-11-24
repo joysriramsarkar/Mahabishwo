@@ -14,6 +14,54 @@ import {
   ToneMappingMode,
 } from 'postprocessing';
 
+/**
+ * Some GPUs / browser drivers advertise half-float color buffers but render
+ * black into them. Probe it with a tiny bright quad; if the readback is dark,
+ * fall back to an 8-bit buffer so the scene is never lost.
+ */
+function supportsHalfFloatTarget(renderer: THREE.WebGLRenderer): boolean {
+  const gl = renderer.getContext() as WebGL2RenderingContext;
+  if (
+    !gl.getExtension('EXT_color_buffer_float') &&
+    !gl.getExtension('EXT_color_buffer_half_float')
+  ) {
+    return false;
+  }
+  let rt: THREE.WebGLRenderTarget | null = null;
+  let scene: THREE.Scene | null = null;
+  let camera: THREE.OrthographicCamera | null = null;
+  let quad: THREE.Mesh | null = null;
+  try {
+    rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, depthBuffer: false });
+    scene = new THREE.Scene();
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    quad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    scene.add(quad);
+    const previous = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    renderer.clear();
+    renderer.render(scene, camera);
+    const pixel = new Uint8Array(4);
+    renderer.readRenderTargetPixels(rt, 0, 0, 1, 1, pixel);
+    renderer.setRenderTarget(previous);
+    return pixel[0] > 200;
+  } catch {
+    return false;
+  } finally {
+    rt?.dispose();
+    if (quad) {
+      quad.geometry.dispose();
+      (quad.material as THREE.Material).dispose();
+    }
+    scene = null;
+    camera = null;
+    quad = null;
+  }
+}
+
 export class PostPipeline {
   public composer: EffectComposer;
   public bloom: BloomEffect;
@@ -22,8 +70,11 @@ export class PostPipeline {
   public toneMapping: ToneMappingEffect;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+    const frameBufferType = supportsHalfFloatTarget(renderer)
+      ? THREE.HalfFloatType
+      : THREE.UnsignedByteType;
     this.composer = new EffectComposer(renderer, {
-      frameBufferType: THREE.HalfFloatType,
+      frameBufferType,
       multisampling: 4,
       depthBuffer: true,
       stencilBuffer: false,
