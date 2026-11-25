@@ -13,6 +13,7 @@ export class TimelinePanel {
     this.container = document.getElementById('timeline-panel')!;
     this.state = state;
     this.render();
+    this.setAge(this.state.cosmicAge);
   }
 
   private render(): void {

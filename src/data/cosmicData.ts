@@ -281,7 +281,65 @@ export const SUPERCLUSTERS: SuperclusterData[] = [
     radiusMly: 260,
     galaxyCount: 100000,
     massSOL: '1 × 10¹⁷',
-    memberClusters: ['Virgo Cluster', 'Hydra-Centaurus', 'Norma', 'Pavo-Indus'],
+    members: [
+      {
+        id: 'virgo',
+        name: 'Virgo Cluster',
+        nameBn: 'ভার্গো ক্লাস্টার',
+        offset: [0, 0, 0],
+        distanceMly: 54,
+        galaxyCount: 1300,
+        massSOL: '1.2 × 10¹⁵',
+        descriptionBn:
+          'লোকাল সুপারক্লাস্টারের হৃদয়—১,৩০০–২,০০০ ছায়াপথের ঘন সমাবেশ, যার কেন্দ্রে বিশাল উপবৃত্তাকার M87 ও তার সুপারম্যাসিভ ব্ল্যাক হোল।',
+      },
+      {
+        id: 'hydra_centaurus',
+        name: 'Hydra-Centaurus Cluster',
+        nameBn: 'হাইড্রা-সেন্টরাস ক্লাস্টার',
+        offset: [-0.55, -0.08, 0.35],
+        distanceMly: 150,
+        galaxyCount: 1000,
+        massSOL: '1 × 10¹⁶',
+        descriptionBn:
+          'গ্রেট অ্যাট্রাক্টর অঞ্চলের প্রধান ক্লাস্টার—ল্যানিয়াকিয়ার সমস্ত ছায়াপথ এই মহাকর্ষীয় কেন্দ্রের দিকে প্রবাহিত হচ্ছে।',
+      },
+      {
+        id: 'norma',
+        name: 'Norma Cluster (Abell 3627)',
+        nameBn: 'নর্মা ক্লাস্টার (Abell 3627)',
+        offset: [0.42, -0.24, -0.48],
+        distanceMly: 220,
+        galaxyCount: 800,
+        massSOL: '1 × 10¹⁶',
+        descriptionBn:
+          'আকাশগঙ্গার সমতল দ্বারা আংশিকভাবে লুকানো বিশাল ক্লাস্টার, গ্রেট অ্যাট্রাক্টরের কেন্দ্রের কাছাকাছি অবস্থিত।',
+      },
+      {
+        id: 'pavo_indus',
+        name: 'Pavo-Indus Cluster',
+        nameBn: 'পাভো-ইন্ডাস ক্লাস্টার',
+        offset: [0.2, 0.32, 0.55],
+        distanceMly: 230,
+        galaxyCount: 600,
+        massSOL: '5 × 10¹⁵',
+        descriptionBn:
+          'দক্ষিণ আকাশের লম্বা ছায়াপথ-শৃঙ্খল, যা পাভো ও ইন্ডাস তারামণ্ডল জুড়ে ল্যানিয়াকিয়ার এক প্রান্ত গঠন করেছে।',
+      },
+      {
+        id: 'fornax',
+        name: 'Fornax Cluster',
+        nameBn: 'ফরন্যাক্স ক্লাস্টার',
+        offset: [0.16, -0.34, 0.2],
+        distanceMly: 62,
+        galaxyCount: 340,
+        massSOL: '7 × 10¹³',
+        descriptionBn:
+          'নিকটবর্তী ছোট কিন্তু ঘন ক্লাস্টার, যেখানে NGC 1365-এর মতো বিখ্যাত বার-স্পাইরাল ছায়াপথ ও প্রচুর আন্তঃক্লাস্টার গরম গ্যাস রয়েছে।',
+      },
+    ],
+    sourceUrl: 'https://www.nature.com/articles/nature13674',
+    sourceName: 'Nature — Tully et al. (2014)',
   },
   {
     id: 'shapley',
@@ -296,7 +354,54 @@ export const SUPERCLUSTERS: SuperclusterData[] = [
     radiusMly: 200,
     galaxyCount: 80000,
     massSOL: '5 × 10¹⁷',
-    memberClusters: ['Abell 3558', 'Abell 3560', 'Abell 3562'],
+    members: [
+      {
+        id: 'abell_3558',
+        name: 'Abell 3558',
+        nameBn: 'Abell 3558 (শ্যাপলি কোর)',
+        offset: [0, 0, 0],
+        distanceMly: 650,
+        galaxyCount: 800,
+        massSOL: '1 × 10¹⁶',
+        descriptionBn:
+          'শ্যাপলি সুপারক্লাস্টারের সর্বাধিক ঘন কেন্দ্র, যেখানে অসংখ্য উপবৃত্তাকার ছায়াপথ ও প্রচণ্ড গরম X-ray গ্যাস রয়েছে।',
+      },
+      {
+        id: 'abell_3560',
+        name: 'Abell 3560',
+        nameBn: 'Abell 3560',
+        offset: [-0.42, 0.2, 0.3],
+        distanceMly: 640,
+        galaxyCount: 400,
+        massSOL: '4 × 10¹⁵',
+        descriptionBn:
+          'শ্যাপলি কোরের পশ্চিম দিকের সমৃদ্ধ ক্লাস্টার, যা প্রধান কেন্দ্রের সঙ্গে মহাকর্ষীয়ভাবে যুক্ত।',
+      },
+      {
+        id: 'abell_3562',
+        name: 'Abell 3562',
+        nameBn: 'Abell 3562',
+        offset: [0.36, -0.16, -0.34],
+        distanceMly: 660,
+        galaxyCount: 450,
+        massSOL: '5 × 10¹⁵',
+        descriptionBn:
+          'শ্যাপলির পূর্ব-দক্ষিণ প্রান্তের ক্লাস্টার; এর কেন্দ্রে একটি শক্তিশালী রেডিও গ্যালাক্সি ও ঘন গরম গ্যাস আছে।',
+      },
+      {
+        id: 'abell_3556',
+        name: 'Abell 3556',
+        nameBn: 'Abell 3556',
+        offset: [0.14, 0.36, 0.18],
+        distanceMly: 630,
+        galaxyCount: 300,
+        massSOL: '3 × 10¹⁵',
+        descriptionBn:
+          'শ্যাপলি চেইনের উত্তর দিকের সদস্য, যা সুপারক্লাস্টারের দীর্ঘ ফিলামেন্টকে আরও বিস্তৃত করে।',
+      },
+    ],
+    sourceUrl: 'https://en.wikipedia.org/wiki/Shapley_Supercluster',
+    sourceName: 'Wikipedia — Shapley Supercluster',
   },
   {
     id: 'perseus_pisces',
@@ -311,7 +416,43 @@ export const SUPERCLUSTERS: SuperclusterData[] = [
     radiusMly: 150,
     galaxyCount: 45000,
     massSOL: '2 × 10¹⁷',
-    memberClusters: ['Perseus Cluster (Abell 426)', 'Pisces Cluster'],
+    members: [
+      {
+        id: 'perseus',
+        name: 'Perseus Cluster (Abell 426)',
+        nameBn: 'পার্সিয়াস ক্লাস্টার (Abell 426)',
+        offset: [0, 0, 0],
+        distanceMly: 240,
+        galaxyCount: 1000,
+        massSOL: '1 × 10¹⁶',
+        descriptionBn:
+          'মহাবিশ্বের সবচেয়ে শক্তিশালী X-ray উৎসগুলোর একটি—এর কেন্দ্রীয় গ্যালাক্সি NGC 1275 থেকে প্রচণ্ড জেট নির্গত হয়।',
+      },
+      {
+        id: 'pisces',
+        name: 'Pisces Cluster',
+        nameBn: 'পাইসিস ক্লাস্টার',
+        offset: [-0.45, 0.16, 0.28],
+        distanceMly: 220,
+        galaxyCount: 500,
+        massSOL: '5 × 10¹⁵',
+        descriptionBn:
+          'পার্সিয়াস-পাইসিস শৃঙ্খলের দক্ষিণ প্রান্ত, যা মীন তারামণ্ডলে একটি দীর্ঘ ছায়াপথ-ফিলামেন্ট গঠন করে।',
+      },
+      {
+        id: 'abell_262',
+        name: 'Abell 262',
+        nameBn: 'Abell 262',
+        offset: [0.4, -0.2, -0.22],
+        distanceMly: 210,
+        galaxyCount: 300,
+        massSOL: '3 × 10¹⁵',
+        descriptionBn:
+          'পার্সিয়াস-পাইসিস সুপারক্লাস্টারের আরেকটি প্রধান নোড, যেখানে অনেক ছোট উপবৃত্তাকার ও লেন্টিকুলার ছায়াপথ রয়েছে।',
+      },
+    ],
+    sourceUrl: 'https://en.wikipedia.org/wiki/Perseus-Pisces_Supercluster',
+    sourceName: 'Wikipedia — Perseus–Pisces Supercluster',
   },
   {
     id: 'coma',
@@ -326,7 +467,32 @@ export const SUPERCLUSTERS: SuperclusterData[] = [
     radiusMly: 100,
     galaxyCount: 30000,
     massSOL: '1.5 × 10¹⁷',
-    memberClusters: ['Coma Cluster (Abell 1656)', 'Leo Cluster'],
+    members: [
+      {
+        id: 'coma_cluster',
+        name: 'Coma Cluster (Abell 1656)',
+        nameBn: 'কোমা ক্লাস্টার (Abell 1656)',
+        offset: [0, 0, 0],
+        distanceMly: 321,
+        galaxyCount: 1000,
+        massSOL: '1 × 10¹⁶',
+        descriptionBn:
+          'কোমা সুপারক্লাস্টারের কেন্দ্র—১,০০০-এর বেশি ছায়াপথের সমাবেশ, যেখানে প্রথম ডার্ক ম্যাটারের প্রমাণ পাওয়া যায় (Zwicky, ১৯৩৩)।',
+      },
+      {
+        id: 'leo_cluster',
+        name: 'Leo Cluster (Abell 1367)',
+        nameBn: 'লিও ক্লাস্টার (Abell 1367)',
+        offset: [0.45, 0.2, -0.24],
+        distanceMly: 330,
+        galaxyCount: 500,
+        massSOL: '3 × 10¹⁵',
+        descriptionBn:
+          'সিংহ তারামণ্ডলের সমৃদ্ধ ক্লাস্টার, যা কোমা ক্লাস্টারের সঙ্গে মিলে সিএফএ২ গ্রেট ওয়ালের একটি প্রধান অংশ গঠন করে।',
+      },
+    ],
+    sourceUrl: 'https://en.wikipedia.org/wiki/Coma_Supercluster',
+    sourceName: 'Wikipedia — Coma Supercluster',
   },
   {
     id: 'bootes_void',
@@ -341,7 +507,9 @@ export const SUPERCLUSTERS: SuperclusterData[] = [
     radiusMly: 165,
     galaxyCount: 60,
     massSOL: 'Negligible',
-    memberClusters: [],
+    members: [],
+    sourceUrl: 'https://en.wikipedia.org/wiki/Bo%C3%B6tes_Void',
+    sourceName: 'Wikipedia — Boötes Void',
   },
 ];
 

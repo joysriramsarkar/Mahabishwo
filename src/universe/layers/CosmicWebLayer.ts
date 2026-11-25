@@ -7,6 +7,7 @@ import { AppState, SceneLayer } from '../../core/types';
 import { SUPERCLUSTERS } from '../../data/cosmicData';
 import { buildStarData, createStarPoints, createGlowSprite } from '../helpers';
 import { mulberry32, gaussianRandom } from '../../utils/math';
+import { getSuperclusterMemberNodes } from '../superclusters';
 
 export class CosmicWebLayer implements SceneLayer {
   public group: THREE.Group = new THREE.Group();
@@ -63,6 +64,38 @@ export class CosmicWebLayer implements SceneLayer {
       pick.userData = { pickType: 'supercluster', nodeId: sc.id };
       this.group.add(pick);
       this.pickTargets.push(pick);
+
+      // Named member clusters get their own small core + click target so the
+      // supercluster can be explored instead of only viewed as one blob.
+      if (!isVoid) {
+        getSuperclusterMemberNodes(sc).forEach((node, index) => {
+          if (index > 0) {
+            const memberGlow = createGlowSprite(
+              sc.color,
+              Math.max(4, size * (0.14 + (index % 3) * 0.02)),
+              0.38,
+              '#ffffff'
+            );
+            memberGlow.position.copy(node.world);
+            this.filamentGroup.add(memberGlow);
+            this.glows.push(memberGlow);
+            this.glowBaseSizes.push(memberGlow.scale.x);
+          }
+
+          const memberPick = new THREE.Mesh(
+            new THREE.SphereGeometry(Math.max(6, size * 0.18), 10, 10),
+            pick.material
+          );
+          memberPick.position.copy(node.world);
+          memberPick.userData = {
+            pickType: 'member',
+            nodeId: node.member.id,
+            superclusterId: sc.id,
+          };
+          this.group.add(memberPick);
+          this.pickTargets.push(memberPick);
+        });
+      }
     });
 
     // --- Secondary galaxy cluster nodes forming a 3D cosmic web around voids ---

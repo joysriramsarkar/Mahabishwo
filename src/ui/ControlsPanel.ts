@@ -6,6 +6,7 @@ import { AppState, DensityLevel, LayerVisibility, QualityLevel } from '../core/t
 import { SceneManager } from '../core/SceneManager';
 import { toBn } from '../utils/math';
 import { SIM_DAYS_PER_SECOND } from '../data/cosmicData';
+import { clearStoredState } from '../core/preferences';
 
 /** Slider raw (0..50) → time scale. 0 stops time; 10 → 1×; every +10 → ×10. */
 function rawToSpeed(raw: number): number {
@@ -40,12 +41,15 @@ export class ControlsPanel {
   }
 
   private render(): void {
+    const scrollTop = this.container.scrollTop;
     const toggles: Array<{ key: keyof LayerVisibility; label: string }> = [
       { key: 'stars', label: 'নক্ষত্র ও গ্যালাক্সি কণা' },
       { key: 'orbits', label: 'কক্ষপথ রেখা' },
       { key: 'habitableZones', label: 'বাসযোগ্য অঞ্চল (HZ)' },
       { key: 'labels', label: 'নাম ও ল্যান্ডমার্ক পিন' },
+      { key: 'nebulae', label: 'নীহারিকা ও তারাগঠন অঞ্চল' },
       { key: 'cosmicWeb', label: 'কসমিক ওয়েব ফিলামেন্ট' },
+      { key: 'cmb', label: 'CMB / মহাজাগতিক দিগন্ত' },
       { key: 'dustLanes', label: 'ছায়াপথ ধূলিস্তর' },
       { key: 'halo', label: 'গ্লোবুলার ক্লাস্টার হ্যালো' },
     ];
@@ -66,17 +70,17 @@ export class ControlsPanel {
     this.container.innerHTML = `
       <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
         <h2 class="text-sm font-bold text-white">⚙️ নিয়ন্ত্রণ প্যানেল</h2>
-        <button id="btn-close-controls" type="button" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+        <button id="btn-close-controls" type="button" aria-label="নিয়ন্ত্রণ প্যানেল বন্ধ করুন" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
       </div>
 
       <!-- Playback -->
       <div class="mt-3 space-y-2.5">
         <div class="flex items-center gap-2">
-          <button id="btn-play-pause" type="button"
+          <button id="btn-play-pause" type="button" aria-pressed="${this.state.isPlaying}"
             class="flex-1 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/25 border border-sky-400/40 text-sky-100 hover:bg-sky-500/35 transition">
             ${this.state.isPlaying ? '⏸ বিরতি দিন' : '▶ চালু করুন'}
           </button>
-          <button id="btn-auto-rotate" type="button"
+          <button id="btn-auto-rotate" type="button" aria-pressed="${this.state.autoRotate}"
             class="px-3 py-1.5 rounded-xl text-xs font-medium border ${
               this.state.autoRotate
                 ? 'bg-indigo-500/30 border-indigo-400/50 text-indigo-100'
@@ -91,12 +95,15 @@ export class ControlsPanel {
             <span>সময়ের গতি (ভৌত ঘড়ি)</span>
             <span id="ctrl-speed-val" class="font-semibold text-sky-200">${formatSimSpeed(this.state.rotationSpeed)}</span>
           </div>
-          <input id="ctrl-speed" type="range" min="0" max="50" step="0.5" value="${speedToRaw(this.state.rotationSpeed)}" class="w-full h-1.5" />
-          <div class="flex gap-1 mt-1.5">
+          <input id="ctrl-speed" type="range" min="0" max="50" step="0.5" aria-label="সময়ের গতি"
+            value="${speedToRaw(this.state.rotationSpeed)}" class="w-full h-1.5" />
+          <div class="flex gap-1 mt-1.5" role="group" aria-label="দ্রুত গতির প্রিসেট">
             ${[1, 10, 100, 1000, 10000]
               .map(
                 (s) => `
-              <button type="button" data-speed="${s}"
+              <button type="button" data-speed="${s}" aria-pressed="${
+                  Math.abs(this.state.rotationSpeed - s) < 0.01
+                }"
                 class="speed-preset flex-1 py-0.5 rounded-lg text-[10px] border transition ${
                   Math.abs(this.state.rotationSpeed - s) < 0.01
                     ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
@@ -126,16 +133,17 @@ export class ControlsPanel {
             <span>HDR ব্লুম (উজ্জ্বলতা)</span>
             <span id="ctrl-bloom-val" class="font-semibold text-amber-200">${toBn(this.state.bloom.toFixed(2))}</span>
           </div>
-          <input id="ctrl-bloom" type="range" min="0" max="1.5" step="0.05" value="${this.state.bloom}" class="w-full h-1.5" />
+          <input id="ctrl-bloom" type="range" min="0" max="1.5" step="0.05" aria-label="HDR ব্লুম উজ্জ্বলতা"
+            value="${this.state.bloom}" class="w-full h-1.5" />
         </div>
 
         <div>
-          <div class="text-[11px] text-slate-300 mb-1.5">নক্ষত্র ঘনত্ব</div>
-          <div class="grid grid-cols-3 gap-1">
+          <div class="text-[11px] text-slate-300 mb-1.5" id="density-label">নক্ষত্র ঘনত্ব</div>
+          <div class="grid grid-cols-3 gap-1" role="group" aria-labelledby="density-label">
             ${(['low', 'medium', 'high'] as DensityLevel[])
               .map(
                 (d) => `
-              <button type="button" data-density="${d}"
+              <button type="button" data-density="${d}" aria-pressed="${this.state.density === d}"
                 class="density-btn py-1 rounded-lg text-[11px] border transition ${
                   this.state.density === d
                     ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
@@ -150,12 +158,12 @@ export class ControlsPanel {
         </div>
 
         <div>
-          <div class="text-[11px] text-slate-300 mb-1.5">গ্রাফিক্স কোয়ালিটি</div>
-          <div class="grid grid-cols-3 gap-1">
+          <div class="text-[11px] text-slate-300 mb-1.5" id="quality-label">গ্রাফিক্স কোয়ালিটি</div>
+          <div class="grid grid-cols-3 gap-1" role="group" aria-labelledby="quality-label">
             ${(['low', 'medium', 'high'] as QualityLevel[])
               .map(
                 (q) => `
-              <button type="button" data-quality="${q}"
+              <button type="button" data-quality="${q}" aria-pressed="${this.state.quality === q}"
                 class="quality-btn py-1 rounded-lg text-[11px] border transition ${
                   this.state.quality === q
                     ? 'bg-indigo-500/30 border-indigo-400/60 text-white font-semibold'
@@ -169,26 +177,37 @@ export class ControlsPanel {
           </div>
         </div>
       </div>
+
+      <div class="mt-4 pt-3 border-t border-white/10">
+        <button id="btn-reset-settings" type="button"
+          class="w-full py-1.5 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-100 transition">
+          ↺ সেটিংস ও সংরক্ষিত ভিউ রিসেট করুন
+        </button>
+      </div>
     `;
 
     this.bindEvents();
+    this.container.scrollTop = scrollTop;
   }
 
   private bindEvents(): void {
     this.container.querySelector('#btn-close-controls')?.addEventListener('click', () => {
       this.state.showControls = false;
       this.container.classList.add('hidden');
+      document.getElementById('btn-toggle-controls')?.setAttribute('aria-expanded', 'false');
     });
 
     const playBtn = this.container.querySelector('#btn-play-pause');
     playBtn?.addEventListener('click', () => {
       this.state.isPlaying = !this.state.isPlaying;
       playBtn.textContent = this.state.isPlaying ? '⏸ বিরতি দিন' : '▶ চালু করুন';
+      playBtn.setAttribute('aria-pressed', String(this.state.isPlaying));
     });
 
     const autoBtn = this.container.querySelector('#btn-auto-rotate');
     autoBtn?.addEventListener('click', () => {
       this.state.autoRotate = !this.state.autoRotate;
+      autoBtn.setAttribute('aria-pressed', String(this.state.autoRotate));
       autoBtn.className = `px-3 py-1.5 rounded-xl text-xs font-medium border ${
         this.state.autoRotate
           ? 'bg-indigo-500/30 border-indigo-400/50 text-indigo-100'
@@ -204,6 +223,7 @@ export class ControlsPanel {
       this.container.querySelectorAll<HTMLButtonElement>('.speed-preset').forEach((btn) => {
         const s = parseFloat(btn.dataset.speed || '0');
         const active = Math.abs(speed - s) < 0.01;
+        btn.setAttribute('aria-pressed', String(active));
         btn.className = `speed-preset flex-1 py-0.5 rounded-lg text-[10px] border transition ${
           active
             ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
@@ -247,6 +267,7 @@ export class ControlsPanel {
         const d = (e.currentTarget as HTMLElement).dataset.density as DensityLevel;
         this.state.density = d;
         this.render();
+        this.container.querySelector<HTMLElement>(`[data-density="${d}"]`)?.focus();
       });
     });
 
@@ -256,12 +277,30 @@ export class ControlsPanel {
         this.state.quality = q;
         this.sceneManager.engine.setQuality(q);
         this.render();
+        this.container.querySelector<HTMLElement>(`[data-quality="${q}"]`)?.focus();
       });
+    });
+
+    this.container.querySelector('#btn-reset-settings')?.addEventListener('click', () => {
+      const confirmed = window.confirm(
+        'সব সেটিংস ও সংরক্ষিত ভিউ মুছে ডিফল্ট অবস্থায় ফিরে যাবেন?'
+      );
+      if (!confirmed) return;
+      clearStoredState();
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch {
+        // Location can be read-only in sandboxed contexts; reload still resets in-memory state.
+      }
+      window.location.reload();
     });
   }
 
   public syncPlayButton(): void {
     const playBtn = this.container.querySelector('#btn-play-pause');
-    if (playBtn) playBtn.textContent = this.state.isPlaying ? '⏸ বিরতি দিন' : '▶ চালু করুন';
+    if (playBtn) {
+      playBtn.textContent = this.state.isPlaying ? '⏸ বিরতি দিন' : '▶ চালু করুন';
+      playBtn.setAttribute('aria-pressed', String(this.state.isPlaying));
+    }
   }
 }

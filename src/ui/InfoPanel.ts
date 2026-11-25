@@ -2,7 +2,7 @@
  * Right Info Panel — rich scientific telemetry, descriptions,
  * clickable child objects and NASA/ESA references.
  */
-import { AppState, ScaleLevel, StatItem } from '../core/types';
+import { AppState, ScaleLevel, StatItem, SuperclusterData } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
 import {
@@ -17,6 +17,7 @@ import {
   EARTH_MEAN_SPEED_KMS,
 } from '../data/cosmicData';
 import { toBn } from '../utils/math';
+import { eventBus } from '../core/EventBus';
 
 export class InfoPanel {
   private container: HTMLElement;
@@ -33,6 +34,14 @@ export class InfoPanel {
   }
 
   public update(): void {
+    const activeSupercluster = this.state.activeSuperclusterId
+      ? SUPERCLUSTERS.find((sc) => sc.id === this.state.activeSuperclusterId)
+      : undefined;
+    if (activeSupercluster && this.state.currentScale <= ScaleLevel.COSMIC_WEB) {
+      this.renderSuperclusterDetail(activeSupercluster);
+      return;
+    }
+
     let title = '';
     let subtitle = '';
     let desc = '';
@@ -62,10 +71,7 @@ export class InfoPanel {
         listItems = SUPERCLUSTERS.map((sc) => ({
           label: sc.nameBn,
           color: sc.color,
-          onClick: () => {
-            this.sceneManager.transitionToScale(ScaleLevel.COSMIC_WEB);
-            this.cameraCtrl.animateTo(0.55, 0.96, 170, sc.position);
-          },
+          onClick: () => this.sceneManager.focusSupercluster(sc.id),
         }));
         sourceName = 'ESA Planck Mission';
         sourceUrl = 'https://www.esa.int/Science_Exploration/Space_Science/Planck';
@@ -85,7 +91,7 @@ export class InfoPanel {
         listItems = SUPERCLUSTERS.map((sc) => ({
           label: sc.nameBn,
           color: sc.color,
-          onClick: () => this.cameraCtrl.animateTo(0.55, 0.96, 150, sc.position),
+          onClick: () => this.sceneManager.focusSupercluster(sc.id),
         }));
         break;
 
@@ -283,7 +289,7 @@ export class InfoPanel {
           </div>
           <p class="text-[11px] text-sky-300/90 mt-0.5 truncate">${subtitle}</p>
         </div>
-        <button id="btn-close-info" type="button" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+        <button id="btn-close-info" type="button" aria-label="তথ্য প্যানেল বন্ধ করুন" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
       </div>
 
       <p class="mt-3 text-xs text-slate-300 leading-relaxed">${desc}</p>
@@ -329,6 +335,8 @@ export class InfoPanel {
     this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
       this.state.showInfo = false;
       this.container.classList.add('hidden');
+      document.body.classList.remove('info-open');
+      document.getElementById('btn-toggle-info')?.setAttribute('aria-expanded', 'false');
     });
 
     this.container.querySelector('#btn-gods-eye')?.addEventListener('click', () => {
@@ -341,6 +349,140 @@ export class InfoPanel {
       btn.addEventListener('click', (e) => {
         const idx = Number((e.currentTarget as HTMLElement).dataset.idx);
         listItems[idx]?.onClick();
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Supercluster / member-cluster deep dive
+  // ------------------------------------------------------------------
+  private renderSuperclusterDetail(sc: SuperclusterData): void {
+    const member = this.state.activeMemberClusterId
+      ? sc.members.find((m) => m.id === this.state.activeMemberClusterId)
+      : undefined;
+
+    const accent = sc.color;
+    const title = member ? member.nameBn : sc.nameBn;
+    const subtitle = member
+      ? `${member.name} • ${toBn(member.distanceMly)} Mly`
+      : `${sc.name} • ~${toBn(sc.radiusMly)} Mly`;
+    const desc = member ? member.descriptionBn : sc.descriptionBn;
+
+    const stats: StatItem[] = member
+      ? [
+          { label: 'দূরত্ব', value: `~${toBn(member.distanceMly)} মিলিয়ন আলোকবর্ষ` },
+          { label: 'ছায়াপথ', value: `~${toBn(member.galaxyCount.toLocaleString('en-IN'))}` },
+          { label: 'ভর', value: `${member.massSOL} সৌরভর` },
+          { label: 'সুপারক্লাস্টার', value: sc.nameBn },
+        ]
+      : [
+          { label: 'ব্যাসার্ধ', value: `~${toBn(sc.radiusMly)} মিলিয়ন আলোকবর্ষ` },
+          { label: 'ছায়াপথ', value: `~${toBn(sc.galaxyCount.toLocaleString('en-IN'))}` },
+          { label: 'ভর', value: `${sc.massSOL} সৌরভর` },
+          { label: 'সদস্য ক্লাস্টার', value: toBn(sc.members.length) },
+        ];
+
+    const members = member
+      ? sc.members.filter((m) => m.id !== member.id)
+      : sc.members;
+    const listTitle = member
+      ? `${sc.nameBn}-এর অন্য সদস্য ক্লাস্টার`
+      : 'সদস্য ক্লাস্টার (ক্লিক করে কাছে যান)';
+    const backLabel = member ? `← ${sc.nameBn}` : '← পুরো মহাবিশ্বে ফিরুন';
+
+    const statsHtml = stats
+      .map(
+        (s) => `
+        <div class="bg-white/5 border border-white/10 rounded-xl px-2.5 py-2">
+          <div class="text-[10px] text-slate-400">${s.label}</div>
+          <div class="text-xs font-semibold text-white mt-0.5">${s.value}</div>
+        </div>`
+      )
+      .join('');
+
+    const membersHtml = members
+      .map(
+        (m, idx) => `
+        <button type="button" data-idx="${idx}"
+          class="sc-member-btn w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/5 text-left text-xs text-slate-200 hover:text-white transition">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background:${accent}; box-shadow:0 0 8px ${accent}"></span>
+          <span class="min-w-0 flex-1 truncate">${m.nameBn}</span>
+          <span class="text-[10px] text-slate-400 shrink-0">${toBn(m.distanceMly)} Mly</span>
+          <span class="text-slate-500 text-[10px]">›</span>
+        </button>`
+      )
+      .join('');
+
+    this.container.innerHTML = `
+      <div class="flex items-start justify-between gap-2 pb-2.5 border-b border-white/10">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${accent}; box-shadow:0 0 10px ${accent}"></span>
+            <h2 class="text-sm font-bold text-white truncate">${title}</h2>
+          </div>
+          <p class="text-[11px] text-sky-300/90 mt-0.5 truncate">${subtitle}</p>
+        </div>
+        <button id="btn-close-info" type="button" aria-label="তথ্য প্যানেল বন্ধ করুন" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+      </div>
+
+      <button id="btn-sc-back" type="button"
+        class="mt-2.5 w-full py-1.5 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-white/15 hover:text-white transition">
+        ${backLabel}
+      </button>
+
+      <p class="mt-3 text-xs text-slate-300 leading-relaxed">${desc}</p>
+
+      <div class="mt-3 grid grid-cols-2 gap-1.5">${statsHtml}</div>
+
+      ${
+        members.length > 0
+          ? `<div class="mt-4 pt-3 border-t border-white/10">
+              <div class="text-[11px] font-semibold text-sky-300 mb-2">${listTitle}</div>
+              <div class="space-y-1.5 max-h-48 overflow-y-auto custom-scroll pr-0.5">${membersHtml}</div>
+            </div>`
+          : ''
+      }
+
+      <div class="mt-4 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
+        <span class="text-slate-400">তথ্যসূত্র:</span>
+        <a href="${sc.sourceUrl}" target="_blank" rel="noopener noreferrer"
+          class="text-sky-300 hover:text-sky-200 underline underline-offset-2 truncate max-w-[180px]">
+          ${sc.sourceName} ↗
+        </a>
+      </div>
+    `;
+
+    this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
+      this.state.showInfo = false;
+      this.container.classList.add('hidden');
+      document.body.classList.remove('info-open');
+      document.getElementById('btn-toggle-info')?.setAttribute('aria-expanded', 'false');
+    });
+
+    this.container.querySelector('#btn-sc-back')?.addEventListener('click', () => {
+      if (member) {
+        this.state.activeMemberClusterId = null;
+        eventBus.emit({
+          type: 'OBJECT_SELECT',
+          objectId: sc.id,
+          scale: this.state.currentScale,
+        });
+      } else {
+        this.state.activeSuperclusterId = null;
+        this.state.activeMemberClusterId = null;
+        eventBus.emit({
+          type: 'OBJECT_SELECT',
+          objectId: '',
+          scale: this.state.currentScale,
+        });
+      }
+    });
+
+    this.container.querySelectorAll('.sc-member-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const idx = Number((e.currentTarget as HTMLElement).dataset.idx);
+        const target = members[idx];
+        if (target) this.sceneManager.focusSuperclusterMember(sc.id, target.id);
       });
     });
   }

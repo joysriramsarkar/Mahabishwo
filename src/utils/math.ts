@@ -1,6 +1,7 @@
 /**
  * Math utilities & procedural generation helpers for the universe simulation.
  */
+import type { DensityLevel } from '../core/types';
 
 // Deterministic PRNG (Mulberry32)
 export function mulberry32(seed: number): () => number {
@@ -116,6 +117,19 @@ export function createFbm2D(seed: number, octaves: number = 5, lacunarity: numbe
 // Clamp
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Star-field brightness for the density setting. Used by every star shader so
+ * the "নক্ষত্র ঘনত্ব" control has a visible effect at all scales.
+ */
+export function densityBrightness(density: DensityLevel): number {
+  return density === 'high' ? 1.08 : density === 'low' ? 0.55 : 0.82;
+}
+
+/** Star sprite size multiplier paired with {@link densityBrightness}. */
+export function densityPointScale(density: DensityLevel): number {
+  return density === 'high' ? 1.18 : density === 'low' ? 0.84 : 1;
 }
 
 // Lerp

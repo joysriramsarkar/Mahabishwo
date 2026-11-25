@@ -9,6 +9,7 @@ import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
 import { SUPERCLUSTERS, GALAXIES } from '../data/cosmicData';
 import { SOLAR_GALACTIC_POS } from '../universe/layers/GalaxyLayer';
+import { getSuperclusterMemberNodes } from '../universe/superclusters';
 
 export class LabelsLayer {
   private el: HTMLElement;
@@ -35,14 +36,34 @@ export class LabelsLayer {
 
     if (scale === ScaleLevel.OBSERVABLE_UNIVERSE || scale === ScaleLevel.COSMIC_WEB) {
       SUPERCLUSTERS.forEach((sc) => {
+        if (sc.id === this.state.activeSuperclusterId) return;
         const worldPos = new THREE.Vector3(...sc.position);
         this.addPin(sc.id, sc.nameBn, sc.color, worldPos, true, () => {
-          if (scale === ScaleLevel.OBSERVABLE_UNIVERSE) {
-            this.sceneManager.transitionToScale(ScaleLevel.COSMIC_WEB);
-          }
-          this.cameraCtrl.animateTo(0.55, 0.96, 150, sc.position);
-        });
+          this.sceneManager.focusSupercluster(sc.id);
+        }, 'supercluster');
       });
+
+      // Once a supercluster is selected, expose its named member clusters as
+      // their own pins so the detail panel and the 3D view stay in sync.
+      const active = SUPERCLUSTERS.find((sc) => sc.id === this.state.activeSuperclusterId);
+      if (active) {
+        getSuperclusterMemberNodes(active).forEach((node) => {
+          const isSelected = node.member.id === this.state.activeMemberClusterId;
+          const shortLabel = node.member.nameBn
+            .replace(/\s*\(.*?\)\s*/g, ' ')
+            .replace(/\s*ক্লাস্টার\s*/, ' ')
+            .trim();
+          this.addPin(
+            node.member.id,
+            shortLabel || node.member.nameBn,
+            active.color,
+            node.world,
+            isSelected,
+            () => this.sceneManager.focusSuperclusterMember(active.id, node.member.id),
+            'member'
+          );
+        });
+      }
     } else if (scale === ScaleLevel.GALAXY_CLUSTER) {
       GALAXIES.forEach((g) => {
         this.addPin(g.id, g.nameBn, g.color, new THREE.Vector3(...g.position), g.id === 'milkyway', () => {
@@ -79,7 +100,8 @@ export class LabelsLayer {
     color: string,
     worldPos: THREE.Vector3,
     pulse: boolean,
-    onClick: () => void
+    onClick: () => void,
+    kind: 'supercluster' | 'member' | 'landmark' = 'landmark'
   ): void {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -90,7 +112,7 @@ export class LabelsLayer {
       onClick();
     });
     this.el.appendChild(btn);
-    this.pins.push({ id, el: btn, worldPos, onClick });
+    this.pins.push({ id, el: btn, worldPos, onClick, kind });
   }
 
   public update(): void {
@@ -100,7 +122,13 @@ export class LabelsLayer {
     const cam = this.sceneManager.engine.camera;
     const scale = this.state.currentScale;
 
+    const selectedId = this.state.activeMemberClusterId ?? this.state.activeSuperclusterId;
+    const placed: Array<{ x: number; y: number }> = [];
+
     this.pins.forEach((pin) => {
+      pin.el.classList.toggle('selected', pin.id === selectedId);
+      pin.el.setAttribute('aria-pressed', String(pin.id === selectedId));
+
       this.worldTmp.copy(pin.worldPos);
       // Account for rotating / transforming parent layer groups
       if (scale === ScaleLevel.OBSERVABLE_UNIVERSE) {
@@ -122,18 +150,33 @@ export class LabelsLayer {
         return;
       }
 
-      const x = (this.proj.x * 0.5 + 0.5) * w;
-      const y = (-this.proj.y * 0.5 + 0.5) * h;
+      let x = (this.proj.x * 0.5 + 0.5) * w;
+      let y = (-this.proj.y * 0.5 + 0.5) * h;
 
       if (x < -40 || x > w + 40 || y < -40 || y > h + 40) {
         pin.el.style.opacity = '0';
         pin.el.style.pointerEvents = 'none';
-      } else {
-        pin.el.style.left = `${x}px`;
-        pin.el.style.top = `${y}px`;
-        pin.el.style.opacity = '1';
-        pin.el.style.pointerEvents = 'auto';
+        return;
       }
+
+      // Member pins sit close together at wide zoom. Nudge overlapping labels
+      // downward in screen space instead of stacking them into an unreadable pile.
+      if (pin.kind === 'member') {
+        let guard = 0;
+        while (
+          guard < 8 &&
+          placed.some((p) => Math.abs(p.y - y) < 27 && Math.abs(p.x - x) < 145)
+        ) {
+          y += 29;
+          guard++;
+        }
+      }
+
+      placed.push({ x, y });
+      pin.el.style.left = `${x}px`;
+      pin.el.style.top = `${y}px`;
+      pin.el.style.opacity = '1';
+      pin.el.style.pointerEvents = 'auto';
     });
   }
 }

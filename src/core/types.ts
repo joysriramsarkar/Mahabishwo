@@ -164,12 +164,26 @@ export interface CosmicObjectBase {
   position: [number, number, number];
 }
 
+export interface MemberClusterData {
+  id: string;
+  name: string;
+  nameBn: string;
+  /** Normalised position inside the parent supercluster (-1..1). */
+  offset: [number, number, number];
+  distanceMly: number;
+  galaxyCount: number;
+  massSOL: string;
+  descriptionBn: string;
+}
+
 // Observable Universe Level
 export interface SuperclusterData extends CosmicObjectBase {
   radiusMly: number;        // Radius in millions of light-years
   galaxyCount: number;      // Estimated galaxy count
   massSOL: string;          // Mass in solar masses (string for large nums)
-  memberClusters: string[]; // Named member clusters
+  members: MemberClusterData[];
+  sourceUrl: string;
+  sourceName: string;
 }
 
 // Galaxy Cluster Level
@@ -290,6 +304,11 @@ export interface AppState {
   activeGalaxyId: string;
   activeClusterId: string;
   activePreset: string;
+  /** Selected supercluster / member cluster for the cosmic-web detail panel. */
+  activeSuperclusterId: string | null;
+  activeMemberClusterId: string | null;
+  /** True while the camera is in the fully-lit "God's Eye" planet portrait. */
+  godsEye: boolean;
   isPlaying: boolean;
   rotationSpeed: number;
   /** Continuous zoom level 0..6 (fractional = between scales, seamless) */
@@ -380,4 +399,5 @@ export interface ProjectedPin {
   el: HTMLButtonElement;
   worldPos: THREE.Vector3;
   onClick: () => void;
+  kind?: 'supercluster' | 'member' | 'landmark';
 }

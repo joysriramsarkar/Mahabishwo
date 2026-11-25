@@ -3,6 +3,12 @@ export default {
   content: ['./index.html', './src/**/*.{ts,js}'],
   theme: {
     extend: {
+      zIndex: {
+        15: '15',
+        25: '25',
+        35: '35',
+        45: '45',
+      },
       fontFamily: {
         sans: ['Inter', 'Hind Siliguri', 'system-ui', '-apple-system', 'sans-serif'],
         bengali: ['Hind Siliguri', 'sans-serif'],

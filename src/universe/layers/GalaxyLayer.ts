@@ -9,7 +9,7 @@ import { AppState, SceneLayer } from '../../core/types';
 import { DISK_VERTEX, DISK_FRAGMENT, BH_LENS_VERTEX, BH_LENS_FRAGMENT } from '../../render/shaders';
 import { TextureFactory } from '../../render/TextureFactory';
 import { buildStarData, createStarPoints, createGlowSprite, createOrbitLine } from '../helpers';
-import { mulberry32, gaussianRandom } from '../../utils/math';
+import { mulberry32, gaussianRandom, densityBrightness, densityPointScale } from '../../utils/math';
 
 export const SOLAR_GALACTIC_POS = new THREE.Vector3(15.5, 0.25, 20.8);
 
@@ -429,9 +429,8 @@ export class GalaxyLayer implements SceneLayer {
 
     this.starMaterial.uniforms.uTime.value = state.elapsedTime;
     this.starMaterial.uniforms.uScale.value =
-      0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
-    this.starMaterial.uniforms.uBrightness.value =
-      state.density === 'high' ? 0.95 : state.density === 'low' ? 0.6 : 0.8;
+      0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(state.density);
+    this.starMaterial.uniforms.uBrightness.value = densityBrightness(state.density);
 
     this.diskMaterial.uniforms.uTime.value = state.elapsedTime;
     if (this.bhLensMesh && this.bhLensMaterial) {

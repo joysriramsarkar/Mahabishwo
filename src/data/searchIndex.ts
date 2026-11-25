@@ -17,6 +17,8 @@ export interface SearchItem {
   planetId?: string;
   galaxyId?: string;
   clusterId?: string;
+  superclusterId?: string;
+  memberId?: string;
 }
 
 export class SearchEngine {
@@ -34,6 +36,21 @@ export class SearchEngine {
         categoryBn: 'সুপারক্লাস্টার',
         scaleLevel: ScaleLevel.COSMIC_WEB,
         color: sc.color,
+        superclusterId: sc.id,
+      });
+
+      sc.members.forEach((member) => {
+        this.items.push({
+          id: member.id,
+          name: member.name,
+          nameBn: member.nameBn,
+          category: 'Galaxy Cluster',
+          categoryBn: 'সদস্য ক্লাস্টার',
+          scaleLevel: ScaleLevel.COSMIC_WEB,
+          color: sc.color,
+          superclusterId: sc.id,
+          memberId: member.id,
+        });
       });
     });
 

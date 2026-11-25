@@ -86,4 +86,39 @@ export class Engine {
   public render(deltaTime?: number): void {
     this.pipeline.render(deltaTime);
   }
+
+  /**
+   * Save the current frame as a PNG. The renderer already uses
+   * `preserveDrawingBuffer`, so a fresh render is all that is required before
+   * reading the canvas back.
+   */
+  public captureScreenshot(onDone?: (ok: boolean) => void): void {
+    try {
+      this.render(0);
+      this.canvas.toBlob((blob) => {
+        if (!blob) {
+          onDone?.(false);
+          return;
+        }
+        const stamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, '-')
+          .replace('T', '_')
+          .slice(0, 19);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `mahabishwo-${stamp}.png`;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        onDone?.(true);
+      }, 'image/png');
+    } catch (error) {
+      console.error('Screenshot failed:', error);
+      onDone?.(false);
+    }
+  }
 }

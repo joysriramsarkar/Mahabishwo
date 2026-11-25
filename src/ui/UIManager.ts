@@ -15,7 +15,10 @@ import { SearchOverlay } from './SearchOverlay';
 import { HelpOverlay } from './HelpOverlay';
 import { LabelsLayer } from './LabelsLayer';
 import { Toasts } from './Toasts';
+import { Tour } from './Tour';
 import { STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
+import { buildShareUrl, syncDeepLink } from '../core/deepLink';
+import { eventBus } from '../core/EventBus';
 
 export class UIManager {
   private state: AppState;
@@ -30,6 +33,7 @@ export class UIManager {
   public searchOverlay: SearchOverlay;
   public helpOverlay: HelpOverlay;
   public labelsLayer: LabelsLayer;
+  public tour: Tour;
 
   constructor(state: AppState, sceneManager: SceneManager, cameraCtrl: CameraController) {
     this.state = state;
@@ -44,12 +48,23 @@ export class UIManager {
     this.searchOverlay = new SearchOverlay(state, cameraCtrl, sceneManager);
     this.helpOverlay = new HelpOverlay(state);
     this.labelsLayer = new LabelsLayer(state, sceneManager, cameraCtrl);
+    this.tour = new Tour((preset) => this.applyPreset(preset));
 
     this.renderBottomNav();
     this.renderZoomControl();
+    this.renderPhotoActions();
     this.bindToolbarEvents();
     this.bindKeyboardShortcuts();
     this.labelsLayer.rebuild();
+    this.syncPanels();
+    this.hud.update();
+
+    eventBus.on('OBJECT_SELECT', (event) => {
+      if (event.type !== 'OBJECT_SELECT') return;
+      this.labelsLayer.rebuild();
+      this.infoPanel.update();
+      syncDeepLink(this.state);
+    });
   }
 
   private renderZoomControl(): void {
@@ -57,13 +72,13 @@ export class UIManager {
     if (!host) return;
     host.innerHTML = `
       <div class="glass-panel rounded-2xl px-2 py-3 flex-col items-center gap-2 flex pointer-events-auto">
-        <button id="btn-zoom-in" type="button" title="জুম ইন"
+        <button id="btn-zoom-in" type="button" title="জুম ইন" aria-label="জুম ইন"
           class="w-8 h-8 rounded-xl bg-sky-500/25 border border-sky-400/40 text-white text-base font-bold hover:bg-sky-500/40 transition">+</button>
-        <input id="zoom-slider" type="range" min="0" max="600" step="1" value="0"
+        <input id="zoom-slider" type="range" min="0" max="600" step="1" value="0" aria-label="ক্রমাগত জুম লেভেল"
           class="zoom-vertical h-36 cursor-pointer" />
-        <button id="btn-zoom-out" type="button" title="জুম আউট"
+        <button id="btn-zoom-out" type="button" title="জুম আউট" aria-label="জুম আউট"
           class="w-8 h-8 rounded-xl bg-white/5 border border-white/15 text-white text-base font-bold hover:bg-white/15 transition">−</button>
-        <div id="zoom-readout" class="text-[9px] font-semibold text-sky-200 text-center leading-tight max-w-[52px]">
+        <div id="zoom-readout" aria-live="off" class="text-[9px] font-semibold text-sky-200 text-center leading-tight max-w-[52px]">
           মহাবিশ্ব
         </div>
       </div>
@@ -80,6 +95,28 @@ export class UIManager {
     });
     host.querySelector('#btn-zoom-out')?.addEventListener('click', () => {
       this.cameraCtrl.zoomToLevel(Math.max(0, this.state.zoomLevel - 0.7), 0.7);
+    });
+  }
+
+  private renderPhotoActions(): void {
+    const host = document.getElementById('photo-actions');
+    if (!host) return;
+    host.innerHTML = `
+      <div class="glass-panel rounded-2xl px-2 py-2 flex items-center gap-1.5 shadow-2xl">
+        <button id="photo-screenshot" type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/25 border border-sky-400/45 text-sky-50 hover:bg-sky-500/40 transition flex items-center gap-1.5">
+          <span aria-hidden="true">📸</span> স্ক্রিনশট <span class="kbd">P</span>
+        </button>
+        <button id="photo-exit" type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 border border-white/10 text-slate-200 hover:bg-white/15 transition flex items-center gap-1.5">
+          <span aria-hidden="true">✕</span> ফিরে যান <span class="kbd">F</span>
+        </button>
+      </div>
+    `;
+
+    host.querySelector('#photo-screenshot')?.addEventListener('click', () => this.captureScreenshot());
+    host.querySelector('#photo-exit')?.addEventListener('click', () => {
+      if (this.state.photoMode) this.togglePhotoMode();
     });
   }
 
@@ -105,7 +142,7 @@ export class UIManager {
           .map((p) =>
             p.id === 'sep'
               ? `<span class="w-px h-5 bg-white/15 mx-0.5 shrink-0"></span>`
-              : `<button type="button" data-preset="${p.id}"
+              : `<button type="button" data-preset="${p.id}" aria-pressed="${p.active ? 'true' : 'false'}"
                   class="view-pill ${p.active ? 'active' : ''} px-3 py-1.5 rounded-xl border border-transparent text-xs ${p.cls}">
                   ${p.label}
                 </button>`
@@ -125,12 +162,16 @@ export class UIManager {
 
   public setActivePill(preset: string): void {
     document.querySelectorAll('#nav-bar .view-pill').forEach((b) => {
-      b.classList.toggle('active', (b as HTMLElement).dataset.preset === preset);
+      const isActive = (b as HTMLElement).dataset.preset === preset;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-pressed', String(isActive));
     });
   }
 
   public applyPreset(preset: string): void {
     this.state.activePreset = preset;
+    this.state.activeSuperclusterId = null;
+    this.state.activeMemberClusterId = null;
     this.setActivePill(preset);
 
     switch (preset) {
@@ -176,75 +217,163 @@ export class UIManager {
         this.sceneManager.flyToPlanet('kepler186', 'k_f');
         break;
     }
+
+    syncDeepLink(this.state);
+    this.infoPanel.update();
+    this.labelsLayer.rebuild();
+  }
+
+  private setPanelVisibility(panel: 'controls' | 'info' | 'timeline' | 'minimap', open: boolean): void {
+    const targets = {
+      controls: { host: 'controls-drawer', button: 'btn-toggle-controls', key: 'showControls', expanded: true },
+      info: { host: 'info-panel', button: 'btn-toggle-info', key: 'showInfo', expanded: true },
+      timeline: { host: 'timeline-panel', button: 'btn-toggle-timeline', key: 'showTimeline', expanded: false },
+      minimap: { host: 'minimap-canvas', button: 'btn-toggle-minimap', key: 'showMinimap', expanded: false },
+    } as const;
+
+    const target = targets[panel];
+    this.state[target.key] = open;
+    document.getElementById(target.host)?.classList.toggle('hidden', !open);
+    document
+      .getElementById(target.button)
+      ?.setAttribute(target.expanded ? 'aria-expanded' : 'aria-pressed', String(open));
+    if (panel === 'info') {
+      document.body.classList.toggle('info-open', open);
+    }
+  }
+
+  /** Push persisted state into the panel visibility and mode classes. */
+  public syncPanels(): void {
+    this.setPanelVisibility('controls', this.state.showControls);
+    this.setPanelVisibility('info', this.state.showInfo);
+    this.setPanelVisibility('timeline', this.state.showTimeline);
+    this.setPanelVisibility('minimap', this.state.showMinimap);
+    document.getElementById('labels-layer')?.classList.toggle('hidden', !this.state.layers.labels);
+    this.applyPhotoModeUi();
   }
 
   private bindToolbarEvents(): void {
     document.getElementById('btn-search')?.addEventListener('click', () => this.searchOverlay.open());
+    document.getElementById('btn-tour')?.addEventListener('click', () => this.tour.start());
+    document.getElementById('btn-share')?.addEventListener('click', () => void this.shareView());
 
     document.getElementById('btn-toggle-controls')?.addEventListener('click', () => {
-      this.state.showControls = !this.state.showControls;
-      document.getElementById('controls-drawer')?.classList.toggle('hidden', !this.state.showControls);
+      this.setPanelVisibility('controls', !this.state.showControls);
     });
 
     document.getElementById('btn-toggle-info')?.addEventListener('click', () => {
-      this.state.showInfo = !this.state.showInfo;
-      document.getElementById('info-panel')?.classList.toggle('hidden', !this.state.showInfo);
+      this.setPanelVisibility('info', !this.state.showInfo);
     });
 
     document.getElementById('btn-toggle-timeline')?.addEventListener('click', () => {
-      this.state.showTimeline = !this.state.showTimeline;
-      document.getElementById('timeline-panel')?.classList.toggle('hidden', !this.state.showTimeline);
+      this.setPanelVisibility('timeline', !this.state.showTimeline);
     });
 
     document.getElementById('btn-toggle-minimap')?.addEventListener('click', () => {
-      this.state.showMinimap = !this.state.showMinimap;
-      document.getElementById('minimap-canvas')?.classList.toggle('hidden', !this.state.showMinimap);
+      this.setPanelVisibility('minimap', !this.state.showMinimap);
     });
 
     document.getElementById('btn-photo-mode')?.addEventListener('click', () => this.togglePhotoMode());
     document.getElementById('btn-help')?.addEventListener('click', () => this.helpOverlay.toggle());
+    document.getElementById('btn-reset-view')?.addEventListener('click', () => {
+      this.cameraCtrl.reset();
+      Toasts.show('↺ ক্যামেরা রিসেট হয়েছে');
+    });
+  }
+
+  /** Copy/share a deep link to the exact current view. */
+  private async shareView(): Promise<void> {
+    const url = buildShareUrl(this.state);
+    const data = {
+      title: 'মহাবিশ্ব সিমুলেশন — My Universe Studio',
+      text: 'এই মহাজাগতিক দৃশ্যটি দেখুন',
+      url,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      Toasts.show('🔗 ভিউয়ের লিংক কপি হয়েছে');
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        Toasts.show('🔗 ভিউয়ের লিংক কপি হয়েছে');
+      } catch {
+        window.prompt('লিংক কপি করুন:', url);
+      }
+    }
+  }
+
+  public captureScreenshot(): void {
+    this.sceneManager.engine.captureScreenshot((ok) => {
+      Toasts.show(ok ? '📸 স্ক্রিনশট সংরক্ষিত হয়েছে' : '⚠️ স্ক্রিনশট নেওয়া যায়নি');
+    });
+  }
+
+  private applyPhotoModeUi(): void {
+    document.body.classList.toggle('photo-mode', this.state.photoMode);
+    document.getElementById('photo-actions')?.classList.toggle('hidden', !this.state.photoMode);
+    document.getElementById('btn-photo-mode')?.setAttribute('aria-pressed', String(this.state.photoMode));
   }
 
   public togglePhotoMode(): void {
     this.state.photoMode = !this.state.photoMode;
-    document.body.classList.toggle('photo-mode', this.state.photoMode);
+    this.applyPhotoModeUi();
     if (this.state.photoMode) {
-      Toasts.show('ফটো মোড চালু — ফিরে আসতে F বা Esc চাপুন', 3000);
+      Toasts.show('ফটো মোড — P চেপে স্ক্রিনশট নিন, F বা Esc দিয়ে ফিরে আসুন', 3200);
     }
   }
 
   private bindKeyboardShortcuts(): void {
     window.addEventListener('keydown', (e) => {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (e.key === '/') {
         e.preventDefault();
         this.searchOverlay.open();
       } else if (e.key === ' ') {
+        // Let a focused button handle Space itself instead of toggling twice.
+        if (target && (target.tagName === 'BUTTON' || target.tagName === 'A')) return;
         e.preventDefault();
         this.state.isPlaying = !this.state.isPlaying;
         this.controlsPanel.syncPlayButton();
         Toasts.show(this.state.isPlaying ? '▶ সিমুলেশন চালু' : '⏸ সিমুলেশন বিরতি');
+      } else if (e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        this.captureScreenshot();
       } else if (e.key.toLowerCase() === 'f') {
         this.togglePhotoMode();
       } else if (e.key.toLowerCase() === 't') {
-        this.state.showTimeline = !this.state.showTimeline;
-        document.getElementById('timeline-panel')?.classList.toggle('hidden', !this.state.showTimeline);
-      } else if (e.key.toLowerCase() === 'h') {
+        this.setPanelVisibility('timeline', !this.state.showTimeline);
+      } else if (e.key.toLowerCase() === 'h' || e.key === '?') {
         this.helpOverlay.toggle();
       } else if (e.key.toLowerCase() === 'r') {
         this.cameraCtrl.reset();
         Toasts.show('↺ ক্যামেরা রিসেট হয়েছে');
       } else if (e.key === 'Escape') {
+        if (this.tour.isOpen) return; // Tour owns Escape while it is open.
         if (this.state.searchOpen) this.searchOverlay.close();
         else if (this.state.helpOpen) this.helpOverlay.close();
         else if (this.state.photoMode) this.togglePhotoMode();
+        else if (this.state.showControls) this.setPanelVisibility('controls', false);
+        else if (this.state.showInfo) this.setPanelVisibility('info', false);
       }
     });
   }
 
   public onScaleChange(_from: ScaleLevel, to: ScaleLevel): void {
+    // A supercluster focus deliberately crosses intermediate scales on its way
+    // to the cosmic web; don't drop the selection mid-flight.
+    if (to >= ScaleLevel.GALAXY_CLUSTER && !this.cameraCtrl.getIsTransitioning()) {
+      this.state.activeSuperclusterId = null;
+      this.state.activeMemberClusterId = null;
+    }
     this.hud.update();
     this.infoPanel.update();
     this.labelsLayer.rebuild();
@@ -257,14 +386,18 @@ export class UIManager {
       [ScaleLevel.STAR_SYSTEM]: this.state.activeSystemId === 'trappist' ? 'trappist' : 'solar',
     };
     if (to === ScaleLevel.PLANET || to === ScaleLevel.SURFACE) {
-      if (this.state.activePreset === 'earth-gods-eye' && this.state.activePlanetId === 'earth') {
+      if (this.state.godsEye && this.state.activePlanetId === 'earth') {
         this.setActivePill('earth-gods-eye');
       } else if (this.state.activePlanetId === 'earth') this.setActivePill('earth');
       else if (this.state.activePlanetId === 'proxima_b') this.setActivePill('proxima');
       else if (this.state.activePlanetId === 'k_f') this.setActivePill('kepler186');
+      else if (this.state.activeSystemId === 'trappist') this.setActivePill('trappist');
+      else if (this.state.activeSystemId === 'solar') this.setActivePill('solar');
     } else if (presetByScale[to]) {
       this.setActivePill(presetByScale[to]!);
     }
+
+    syncDeepLink(this.state);
   }
 
   public update(): void {
@@ -273,13 +406,16 @@ export class UIManager {
     this.infoPanel.updateTelemetry();
 
     // Sync continuous zoom slider & readout
+    const cfg = SCALE_CONFIGS[Math.max(0, Math.min(6, Math.round(this.state.zoomLevel)))];
     const slider = document.getElementById('zoom-slider') as HTMLInputElement | null;
-    if (slider && document.activeElement !== slider) {
-      slider.value = String(Math.round((this.state.zoomLevel / 6) * 600));
+    if (slider) {
+      if (document.activeElement !== slider) {
+        slider.value = String(Math.round((this.state.zoomLevel / 6) * 600));
+      }
+      slider.setAttribute('aria-valuetext', cfg.shortBn);
     }
     const readout = document.getElementById('zoom-readout');
     if (readout) {
-      const cfg = SCALE_CONFIGS[Math.max(0, Math.min(6, Math.round(this.state.zoomLevel)))];
       readout.textContent = cfg.shortBn;
     }
   }

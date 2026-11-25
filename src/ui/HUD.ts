@@ -73,42 +73,51 @@ export class HUD {
       </div>
 
       <!-- Action Toolbar -->
-      <div class="glass-panel pointer-events-auto rounded-2xl p-1.5 flex items-center gap-1 shrink-0">
-        <button id="btn-search" type="button" title="অনুসন্ধান (/)"
+      <div class="glass-panel pointer-events-auto rounded-2xl p-1.5 flex items-center gap-1 shrink-0" role="toolbar" aria-label="দ্রুত অ্যাকশন">
+        <button id="btn-search" type="button" title="অনুসন্ধান (/)" aria-label="মহাবিশ্বে অনুসন্ধান করুন" aria-haspopup="dialog"
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1">
-          <span>🔍</span><span class="hidden lg:inline">খুঁজুন</span>
+          <span aria-hidden="true">🔍</span><span class="hidden lg:inline">খুঁজুন</span>
         </button>
-        <button id="btn-toggle-sound" type="button" title="মহাজাগতিক শব্দ"
+        <button id="btn-tour" type="button" title="গাইডেড ট্যুর" aria-label="গাইডেড ট্যুর শুরু করুন"
+          class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-amber-100 hover:text-white hover:bg-amber-500/20 transition flex items-center gap-1">
+          <span aria-hidden="true">🎬</span><span class="hidden lg:inline">ট্যুর</span>
+        </button>
+        <button id="btn-share" type="button" title="এই ভিউয়ের লিংক শেয়ার করুন" aria-label="এই ভিউয়ের লিংক শেয়ার করুন"
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1">
-          <span id="hud-sound-icon">🔇</span><span class="hidden lg:inline">শব্দ</span>
+          <span aria-hidden="true">🔗</span><span class="hidden lg:inline">শেয়ার</span>
         </button>
-        <button id="btn-toggle-timeline" type="button" title="টাইমলাইন (T)"
+        <button id="btn-toggle-sound" type="button" title="মহাজাগতিক শব্দ" aria-label="মহাজাগতিক শব্দ চালু বা বন্ধ করুন"
+          aria-pressed="${this.state.soundEnabled}"
+          class="hud-btn hidden sm:flex px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition items-center gap-1">
+          <span id="hud-sound-icon" aria-hidden="true">🔇</span><span class="hidden lg:inline">শব্দ</span>
+        </button>
+        <button id="btn-toggle-timeline" type="button" title="টাইমলাইন (T)" aria-label="মহাজাগতিক টাইমলাইন" aria-pressed="${this.state.showTimeline}"
+          class="hud-btn hidden sm:flex px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition items-center gap-1">
+          <span aria-hidden="true">⏳</span><span class="hidden lg:inline">টাইমলাইন</span>
+        </button>
+        <button id="btn-toggle-minimap" type="button" title="রাডার মিনিম্যাপ" aria-label="রাডার মিনিম্যাপ" aria-pressed="${this.state.showMinimap}"
+          class="hud-btn hidden sm:flex px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition">
+          <span aria-hidden="true">🧭</span>
+        </button>
+        <button id="btn-toggle-controls" type="button" title="নিয়ন্ত্রণ প্যানেল" aria-label="নিয়ন্ত্রণ প্যানেল" aria-expanded="${this.state.showControls}"
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1">
-          <span>⏳</span><span class="hidden lg:inline">টাইমলাইন</span>
+          <span aria-hidden="true">⚙️</span><span class="hidden md:inline">নিয়ন্ত্রণ</span>
         </button>
-        <button id="btn-toggle-minimap" type="button" title="রাডার মিনিম্যাপ"
-          class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition">
-          🧭
-        </button>
-        <button id="btn-toggle-controls" type="button" title="নিয়ন্ত্রণ প্যানেল"
-          class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1">
-          <span>⚙️</span><span class="hidden md:inline">নিয়ন্ত্রণ</span>
-        </button>
-        <button id="btn-toggle-info" type="button" title="তথ্য প্যানেল"
+        <button id="btn-toggle-info" type="button" title="তথ্য প্যানেল" aria-label="তথ্য প্যানেল" aria-expanded="${this.state.showInfo}"
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium bg-sky-500/20 text-sky-100 hover:bg-sky-500/35 border border-sky-400/30 transition flex items-center gap-1">
-          <span>ℹ️</span><span class="hidden md:inline">তথ্য</span>
+          <span aria-hidden="true">ℹ️</span><span class="hidden md:inline">তথ্য</span>
         </button>
-        <button id="btn-photo-mode" type="button" title="ফটো মোড (F)"
+        <button id="btn-photo-mode" type="button" title="ফটো মোড (F)" aria-label="ফটো মোড" aria-pressed="${this.state.photoMode}" aria-haspopup="true"
           class="hud-btn px-2 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/10 transition">
-          📷
+          <span aria-hidden="true">📷</span>
         </button>
-        <button id="btn-help" type="button" title="গাইড ও শর্টকাট (H)"
+        <button id="btn-help" type="button" title="গাইড ও শর্টকাট (H)" aria-label="গাইড ও শর্টকাট" aria-haspopup="dialog"
           class="hud-btn px-2 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/10 transition">
-          ?
+          <span aria-hidden="true">?</span>
         </button>
-        <button id="btn-reset-view" type="button" title="রিসেট ভিউ (R)"
-          class="hud-btn px-2 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/10 transition">
-          ↺
+        <button id="btn-reset-view" type="button" title="রিসেট ভিউ (R)" aria-label="ক্যামেরা ভিউ রিসেট করুন"
+          class="hud-btn hidden sm:block px-2 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/10 transition">
+          <span aria-hidden="true">↺</span>
         </button>
       </div>
     `;
@@ -169,6 +178,11 @@ export class HUD {
     }
     if (readout) readout.textContent = cfg.readoutBn;
     if (ageEl) ageEl.textContent = toBn(this.state.cosmicAge.toFixed(1));
+
+    const srStatus = document.getElementById('sr-status');
+    if (srStatus) {
+      srStatus.textContent = `বর্তমান স্কেল: ${cfg.nameBn}। ${cfg.readoutBn}।`;
+    }
 
     const showGal = this.state.currentScale >= ScaleLevel.GALAXY;
     const showSys = this.state.currentScale >= ScaleLevel.STAR_SYSTEM;

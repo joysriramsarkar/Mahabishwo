@@ -14,6 +14,17 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Visible keyboard focus everywhere (the 3D canvas is pointer-first, so
+   keyboard users need an explicit, high-contrast ring). */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
 html,
 body {
   margin: 0;
@@ -123,6 +134,13 @@ input[type='range'] {
   transform: translate(-50%, -50%) scale(1.07);
   z-index: 25;
 }
+.landmark-pin.selected {
+  background: rgba(14, 58, 138, 0.95);
+  border-color: rgba(147, 197, 253, 1);
+  box-shadow:
+    0 0 0 1px rgba(147, 197, 253, 0.45),
+    0 0 22px rgba(56, 189, 248, 0.55);
+}
 
 .pin-dot {
   width: 7px;
@@ -193,14 +211,33 @@ input[type='range'] {
   }
 }
 
-/* Photo mode hides HUDchrome cleanly */
+/* Keep the zoom rail beside the info panel instead of underneath it. */
+body.info-open #zoom-control {
+  right: 21.5rem;
+}
+@media (max-width: 639px) {
+  body.info-open #zoom-control {
+    display: none;
+  }
+}
+
+/* Keep floating cards clear of the right-hand info panel. */
+@media (min-width: 768px) {
+  body.info-open #tour-panel {
+    left: calc((100vw - 21.5rem) / 2);
+  }
+}
+
+/* Photo mode hides HUD chrome cleanly */
 body.photo-mode #hud-top,
 body.photo-mode #controls-drawer,
 body.photo-mode #info-panel,
 body.photo-mode #timeline-panel,
 body.photo-mode #minimap-canvas,
 body.photo-mode #nav-bar,
-body.photo-mode #labels-layer {
+body.photo-mode #zoom-control,
+body.photo-mode #labels-layer,
+body.photo-mode #tour-panel {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 0.35s ease;
@@ -238,4 +275,26 @@ body.photo-mode #labels-layer {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 5px;
   color: rgba(226, 232, 240, 0.85);
+}
+
+/* Guided tour progress dots */
+.tour-dot {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.tour-dot[aria-current='step'] {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+}
+
+/* Respect the OS "reduce motion" setting for all decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

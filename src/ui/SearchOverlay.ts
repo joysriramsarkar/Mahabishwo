@@ -6,16 +6,19 @@ import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
 import { SearchEngine, SearchItem } from '../data/searchIndex';
 import { SUPERCLUSTERS, GALAXIES, STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
+import { focusSoon, rememberFocus, restoreFocus, trapFocus } from '../utils/a11y';
 
 export class SearchOverlay {
   private overlay: HTMLElement;
   private input: HTMLInputElement;
   private resultsEl: HTMLElement;
+  private statusEl: HTMLElement | null;
   private state: AppState;
   private cameraCtrl: CameraController;
   private sceneManager: SceneManager;
   private currentResults: SearchItem[] = [];
   private selectedIndex = 0;
+  private previousFocus: HTMLElement | null = null;
 
   constructor(state: AppState, cameraCtrl: CameraController, sceneManager: SceneManager) {
     this.state = state;
@@ -25,6 +28,7 @@ export class SearchOverlay {
     this.overlay = document.getElementById('search-overlay')!;
     this.input = document.getElementById('search-input') as HTMLInputElement;
     this.resultsEl = document.getElementById('search-results')!;
+    this.statusEl = document.getElementById('search-status');
 
     SearchEngine.initialize();
     this.bindEvents();
@@ -34,6 +38,7 @@ export class SearchOverlay {
     this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) this.close();
     });
+    this.overlay.addEventListener('keydown', (e) => trapFocus(this.overlay, e));
 
     this.input.addEventListener('input', () => {
       this.selectedIndex = 0;
@@ -59,30 +64,48 @@ export class SearchOverlay {
   }
 
   public open(): void {
+    if (this.state.searchOpen) {
+      focusSoon(this.input);
+      return;
+    }
+    this.previousFocus = rememberFocus();
     this.state.searchOpen = true;
     this.overlay.classList.remove('hidden');
+    this.input.setAttribute('aria-expanded', 'true');
     this.input.value = '';
     this.selectedIndex = 0;
     this.renderResults('');
-    window.setTimeout(() => this.input.focus(), 30);
+    focusSoon(this.input);
   }
 
   public close(): void {
+    if (!this.state.searchOpen) return;
     this.state.searchOpen = false;
     this.overlay.classList.add('hidden');
+    this.input.setAttribute('aria-expanded', 'false');
+    this.input.removeAttribute('aria-activedescendant');
+    restoreFocus(this.previousFocus);
+    this.previousFocus = null;
   }
 
   private renderResults(query: string): void {
     this.currentResults = SearchEngine.search(query);
     if (this.currentResults.length === 0) {
       this.resultsEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">কোনো ফলাফল পাওয়া যায়নি</div>`;
+      this.input.removeAttribute('aria-activedescendant');
+      if (this.statusEl) this.statusEl.textContent = 'কোনো ফলাফল পাওয়া যায়নি';
       return;
+    }
+
+    if (this.statusEl) {
+      this.statusEl.textContent = `${this.currentResults.length}টি ফলাফল পাওয়া গেছে`;
     }
 
     this.resultsEl.innerHTML = this.currentResults
       .map(
         (item, idx) => `
-        <button type="button" data-idx="${idx}"
+        <button type="button" role="option" id="search-result-${idx}" data-idx="${idx}"
+          aria-selected="${idx === this.selectedIndex}"
           class="search-result-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition ${
             idx === this.selectedIndex ? 'bg-sky-500/25 border border-sky-400/40' : 'hover:bg-white/10 border border-transparent'
           }">
@@ -97,12 +120,19 @@ export class SearchOverlay {
       )
       .join('');
 
+    this.input.setAttribute('aria-activedescendant', `search-result-${this.selectedIndex}`);
+
     this.resultsEl.querySelectorAll('.search-result-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const idx = Number((e.currentTarget as HTMLElement).dataset.idx);
         if (this.currentResults[idx]) this.navigateTo(this.currentResults[idx]);
       });
     });
+
+    const selected = this.resultsEl.querySelector<HTMLElement>(
+      `#search-result-${this.selectedIndex}`
+    );
+    selected?.scrollIntoView({ block: 'nearest' });
   }
 
   private navigateTo(item: SearchItem): void {
@@ -110,9 +140,17 @@ export class SearchOverlay {
 
     switch (item.scaleLevel) {
       case ScaleLevel.COSMIC_WEB: {
-        const sc = SUPERCLUSTERS.find((s) => s.id === item.id);
-        this.sceneManager.transitionToScale(ScaleLevel.COSMIC_WEB);
-        this.cameraCtrl.animateTo(0.55, 0.96, 155, sc ? sc.position : [0, 0, 0]);
+        if (item.memberId && item.superclusterId) {
+          this.sceneManager.focusSuperclusterMember(item.superclusterId, item.memberId);
+          break;
+        }
+        const sc = SUPERCLUSTERS.find((s) => s.id === (item.superclusterId || item.id));
+        if (sc) {
+          this.sceneManager.focusSupercluster(sc.id);
+        } else {
+          this.sceneManager.transitionToScale(ScaleLevel.COSMIC_WEB);
+          this.cameraCtrl.animateTo(0.55, 0.96, 155, [0, 0, 0]);
+        }
         break;
       }
       case ScaleLevel.GALAXY_CLUSTER:

@@ -19,10 +19,11 @@ import { GalaxyLayer, SOLAR_GALACTIC_POS } from '../universe/layers/GalaxyLayer'
 import { StarSystemLayer } from '../universe/layers/StarSystemLayer';
 import { PlanetLayer } from '../universe/layers/PlanetLayer';
 import { buildStarData, createStarPoints, updateNightTerminators, updateSunDirections } from '../universe/helpers';
+import { getSuperclusterMemberNodes } from '../universe/superclusters';
 import { GALAXY_SKY_VERTEX, GALAXY_SKY_FRAGMENT } from '../render/shaders';
-import { STAR_SYSTEMS_CATALOG, GALAXIES } from '../data/cosmicData';
+import { STAR_SYSTEMS_CATALOG, GALAXIES, SUPERCLUSTERS } from '../data/cosmicData';
 import { RealTextures } from '../render/RealTextures';
-import { mulberry32, gaussianRandom, clamp } from '../utils/math';
+import { mulberry32, gaussianRandom, clamp, densityBrightness, densityPointScale } from '../utils/math';
 
 interface FadeEntry {
   mat: THREE.Material & { opacity: number; transparent: boolean; depthWrite: boolean };
@@ -400,9 +401,13 @@ export class SceneManager {
 
     // Background starfield & Milky Way band dim slightly on planetary close-up
     if (this.backgroundMat) {
+      const density = this.state.density;
       this.backgroundMat.uniforms.uTime.value = this.state.elapsedTime;
       this.backgroundMat.uniforms.uScale.value =
-        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(density);
+      if (this.backgroundMat.uniforms.uBrightness) {
+        this.backgroundMat.uniforms.uBrightness.value = densityBrightness(density);
+      }
       if (this.backgroundMat.uniforms.uOpacity) {
         this.backgroundMat.uniforms.uOpacity.value = tEff > 4.6 ? 0.55 : 0.95;
       }
@@ -433,6 +438,7 @@ export class SceneManager {
   }
 
   private selectActivePlanet(pData: PlanetData): void {
+    this.state.godsEye = false;
     if (pData.id === this.state.activePlanetId && this.planet.activePlanet?.id === pData.id) {
       return;
     }
@@ -551,10 +557,21 @@ export class SceneManager {
 
   public transitionToScale(
     newScale: ScaleLevel,
-    options: { systemId?: string; planetId?: string; galaxyId?: string; clusterId?: string } = {}
+    options: {
+      systemId?: string;
+      planetId?: string;
+      galaxyId?: string;
+      clusterId?: string;
+      /** Internal: keep the selected supercluster when focusing it. */
+      preserveSelection?: boolean;
+    } = {}
   ): void {
     // No instant visibility toggle anymore — the continuous zoom blends.
     // This method only prepares data (which system / planet is active).
+    if (!options.preserveSelection) {
+      this.state.activeSuperclusterId = null;
+      this.state.activeMemberClusterId = null;
+    }
     if (options.galaxyId) this.state.activeGalaxyId = options.galaxyId;
     if (options.clusterId) this.state.activeClusterId = options.clusterId;
 
@@ -579,6 +596,7 @@ export class SceneManager {
 
     if (rebuilt) this.refreshSlotFades();
     this.state.currentScale = newScale;
+    if (newScale < ScaleLevel.PLANET) this.state.godsEye = false;
 
     // Sync portal gates with explicit scale navigation
     this.enteredLocalGroup = newScale >= ScaleLevel.GALAXY_CLUSTER;
@@ -598,6 +616,7 @@ export class SceneManager {
 
   /** Fly smoothly to any planet at its live orbital position and lock tracking onto it. */
   public flyToPlanet(systemId: string, planetId: string, duration = 1.35): void {
+    this.state.godsEye = false;
     this.transitionToScale(ScaleLevel.PLANET, { systemId, planetId });
     if (!this.cameraCtrl) return;
     const item = this.starSystem.planets.find((p) => p.data.id === planetId);
@@ -605,8 +624,12 @@ export class SceneManager {
     if (item) {
       const pos = new THREE.Vector3();
       item.group.getWorldPosition(pos);
+      // Approach from the sunward side with an oblique offset so the planet is
+      // clearly lit (and its terminator visible) instead of showing a black
+      // night hemisphere. The God's Eye preset remains the fully-lit portrait.
+      const sunwardTheta = Math.atan2(pos.x, pos.z) + Math.PI;
       this.cameraCtrl.animateTo(
-        0.85,
+        sunwardTheta + 0.55,
         1.18,
         targetRadius,
         pos,
@@ -630,6 +653,7 @@ export class SceneManager {
    * planet as it continues its Kepler orbit.
    */
   public flyToGodsEye(systemId: string, planetId: string, duration = 1.6): void {
+    this.state.godsEye = true;
     this.transitionToScale(ScaleLevel.PLANET, { systemId, planetId });
     if (!this.cameraCtrl) return;
     const item = this.starSystem.planets.find((p) => p.data.id === planetId);
@@ -653,11 +677,56 @@ export class SceneManager {
     );
   }
 
+  /** Select a named supercluster and frame its whole galaxy concentration. */
+  public focusSupercluster(superclusterId: string): void {
+    const sc = SUPERCLUSTERS.find((s) => s.id === superclusterId);
+    if (!sc) return;
+
+    this.state.activeSuperclusterId = sc.id;
+    this.state.activeMemberClusterId = null;
+    this.state.activePreset = 'cosmic-web';
+    this.transitionToScale(ScaleLevel.COSMIC_WEB, { preserveSelection: true });
+
+    const target = new THREE.Vector3(...sc.position).applyEuler(this.cosmicWeb.group.rotation);
+    // Stay inside the cosmic-web scale so the supercluster and its member pins
+    // remain visible; crossing into galaxy scale would replace the layer.
+    this.cameraCtrl?.animateTo(0.55, 0.96, 230, target);
+    eventBus.emit({ type: 'OBJECT_SELECT', objectId: sc.id, scale: ScaleLevel.COSMIC_WEB });
+  }
+
+  /** Select one member cluster and fly to its core. */
+  public focusSuperclusterMember(superclusterId: string, memberId: string): void {
+    const sc = SUPERCLUSTERS.find((s) => s.id === superclusterId);
+    const node = sc
+      ? getSuperclusterMemberNodes(sc).find((n) => n.member.id === memberId)
+      : null;
+    if (!sc || !node) return;
+
+    this.state.activeSuperclusterId = sc.id;
+    this.state.activeMemberClusterId = node.member.id;
+    this.state.activePreset = 'cosmic-web';
+    this.transitionToScale(ScaleLevel.COSMIC_WEB, { preserveSelection: true });
+
+    const target = node.world.clone().applyEuler(this.cosmicWeb.group.rotation);
+    this.cameraCtrl?.animateTo(0.55, 0.96, 230, target);
+    eventBus.emit({
+      type: 'OBJECT_SELECT',
+      objectId: node.member.id,
+      scale: ScaleLevel.COSMIC_WEB,
+    });
+  }
+
   /** Raycast tap against interactive objects in the current scale. */
   public pickAt(
     clientX: number,
     clientY: number
-  ): { type: string; id: string; systemId?: string; position?: THREE.Vector3 } | null {
+  ): {
+    type: string;
+    id: string;
+    systemId?: string;
+    superclusterId?: string;
+    position?: THREE.Vector3;
+  } | null {
     const scale = this.state.currentScale;
     let targets: THREE.Object3D[] = [];
 
@@ -686,6 +755,7 @@ export class SceneManager {
       type: ud.pickType || 'object',
       id: ud.planetId || ud.galaxyId || ud.nodeId || ud.id || '',
       systemId: ud.systemId,
+      superclusterId: ud.superclusterId,
       position: worldPos,
     };
   }

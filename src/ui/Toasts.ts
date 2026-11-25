@@ -13,6 +13,11 @@ export class Toasts {
     const host = this.getContainer();
     if (!host) return;
 
+    // Keep the stack short so it never covers the navigation bar.
+    while (host.children.length >= 3) {
+      host.firstElementChild?.remove();
+    }
+
     const item = document.createElement('div');
     item.className = 'toast-item glass-panel px-4 py-2 rounded-full text-xs font-medium text-sky-100';
     item.textContent = message;

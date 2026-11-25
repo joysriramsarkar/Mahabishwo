@@ -8,7 +8,8 @@ import { AppState, SceneLayer } from '../../core/types';
 import { SUPERCLUSTERS } from '../../data/cosmicData';
 import { CMB_VERTEX, CMB_FRAGMENT } from '../../render/shaders';
 import { buildStarData, createStarPoints, createAtmosphere } from '../helpers';
-import { mulberry32 } from '../../utils/math';
+import { mulberry32, densityBrightness, densityPointScale } from '../../utils/math';
+import { buildSuperclusterClouds, type SuperclusterGlow, getSuperclusterMemberNodes } from '../superclusters';
 
 const SPHERE_RADIUS = 400;
 
@@ -27,9 +28,13 @@ export class ObservableUniverseLayer implements SceneLayer {
   public pickTargets: THREE.Object3D[] = [];
 
   private cmbMaterial: THREE.ShaderMaterial;
+  private cmbMesh: THREE.Mesh;
   private starMaterial: THREE.ShaderMaterial;
   private filamentGroup = new THREE.Group();
   private galaxyPoints: THREE.Points;
+  private superclusterGroup = new THREE.Group();
+  private superclusterMaterial: THREE.ShaderMaterial | null = null;
+  private superclusterGlows: SuperclusterGlow[] = [];
 
   constructor() {
     // --- Large-scale-structure sphere ---
@@ -44,11 +49,26 @@ export class ObservableUniverseLayer implements SceneLayer {
       },
       side: THREE.BackSide,
       transparent: true,
-      depthWrite: true,
+      depthWrite: false,
     });
     const cmb = new THREE.Mesh(cmbGeo, this.cmbMaterial);
     cmb.frustumCulled = false;
+    // The CMB is the backdrop of the God's Eye view. Draw it before every
+    // other transparent object so superclusters and the deep field sit on top.
+    cmb.renderOrder = -20;
+    this.cmbMesh = cmb;
     this.group.add(cmb);
+
+    // --- Named superclusters as real 3D galaxy concentrations ---
+    const superclusters = buildSuperclusterClouds(SUPERCLUSTERS, {
+      scale: 1,
+      seed: 7301,
+      galaxyDensity: 0.9,
+    });
+    this.superclusterGroup.add(superclusters.group);
+    this.superclusterMaterial = superclusters.material;
+    this.superclusterGlows = superclusters.glows;
+    this.group.add(this.superclusterGroup);
 
     // Invisible pick spheres on supercluster nodes (tap to fly there)
     const pickMat = new THREE.MeshBasicMaterial({
@@ -63,6 +83,18 @@ export class ObservableUniverseLayer implements SceneLayer {
       s.userData = { pickType: 'supercluster', nodeId: sc.id };
       this.group.add(s);
       this.pickTargets.push(s);
+
+      getSuperclusterMemberNodes(sc).forEach((node) => {
+        const memberPick = new THREE.Mesh(new THREE.SphereGeometry(9, 10, 10), pickMat);
+        memberPick.position.copy(node.world);
+        memberPick.userData = {
+          pickType: 'member',
+          nodeId: node.member.id,
+          superclusterId: sc.id,
+        };
+        this.group.add(memberPick);
+        this.pickTargets.push(memberPick);
+      });
     });
 
     // Subtle cosmic-horizon rim glow around the observable sphere
@@ -138,9 +170,25 @@ export class ObservableUniverseLayer implements SceneLayer {
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
     this.cmbMaterial.uniforms.uTime.value += dt;
+    this.cmbMesh.visible = state.layers.cmb;
+    this.superclusterGroup.visible = state.layers.cosmicWeb;
+
     this.starMaterial.uniforms.uTime.value = state.elapsedTime;
     this.starMaterial.uniforms.uScale.value =
-      0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+      0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(state.density);
+    this.starMaterial.uniforms.uBrightness.value = densityBrightness(state.density);
+
+    if (this.superclusterMaterial) {
+      this.superclusterMaterial.uniforms.uTime.value = state.elapsedTime;
+      this.superclusterMaterial.uniforms.uScale.value =
+        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(state.density);
+      this.superclusterMaterial.uniforms.uBrightness.value = densityBrightness(state.density) * 1.5;
+    }
+    const pulse = 1 + Math.sin(state.elapsedTime * 0.85) * 0.05;
+    this.superclusterGlows.forEach((entry) => {
+      entry.sprite.scale.set(entry.baseSize * pulse, entry.baseSize * pulse, 1);
+    });
+
     this.filamentGroup.visible = state.layers.cosmicWeb;
     this.group.rotation.y += dt * 0.004 * Math.min(state.rotationSpeed, 6);
   }

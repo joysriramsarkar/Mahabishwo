@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { AppState, ScaleLevel, SphericalCameraState, SCALE_CONFIGS } from './types';
 import { clamp, damp } from '../utils/math';
+import { prefersReducedMotion } from '../utils/a11y';
 
 /** Camera radius at each integer scale level. */
 export const SCALE_RADII = [430, 280, 175, 110, 44, 10, 5.6];
@@ -165,7 +166,7 @@ export class CameraController {
     gsap.killTweensOf(this.coords);
     gsap.to(this.coords, {
       targetRadius,
-      duration,
+      duration: prefersReducedMotion() ? 0.01 : duration,
       ease: 'power2.inOut',
     });
   }
@@ -232,6 +233,7 @@ export class CameraController {
     const targetVec = Array.isArray(targetPos) ? new THREE.Vector3(...targetPos) : targetPos;
     const minR = Math.max(GLOBAL_MIN_RADIUS, this.state.cameraMinRadius || GLOBAL_MIN_RADIUS);
     const clampedRadius = clamp(targetRadius, minR, GLOBAL_MAX_RADIUS);
+    const motionDuration = prefersReducedMotion() ? 0.01 : duration;
     this.isTransitioning = true;
     this.trackingObject = null;
     this.trackingOffset.set(0, 0, 0);
@@ -250,7 +252,7 @@ export class CameraController {
       targetPhi,
       radius: clampedRadius,
       targetRadius: clampedRadius,
-      duration,
+      duration: motionDuration,
       ease: 'power3.inOut',
       onComplete: () => {
         this.isTransitioning = false;
@@ -262,7 +264,7 @@ export class CameraController {
     if (this.flyFollowObj) {
       gsap.to(this, {
         flyProgress: 1,
-        duration,
+        duration: motionDuration,
         ease: 'power3.inOut',
       });
     } else {
@@ -270,7 +272,7 @@ export class CameraController {
         x: targetVec.x,
         y: targetVec.y,
         z: targetVec.z,
-        duration,
+        duration: motionDuration,
         ease: 'power3.inOut',
       });
       this.coords.desiredTarget.copy(targetVec);
