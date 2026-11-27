@@ -14,9 +14,14 @@
 
 ## ক্যাননিক্যাল কার্যকরী কোড (কোথায় সম্পাদনা হবে)
 
+> ২৭ নভে. ২০২৬-এ `cosmos/` মনোরিপো বাস্তবায়িত (ভাগ ১৪.৪, ADR-0001)। সব নতুন কাজ `cosmos/`-এ।
+
 | কোডবেস | ক্যাননিক্যাল কপি (রিপো-রুট থেকে) | অন্য কপি | অবস্থা |
 |---|---|---|---|
-| Explorer (React/TS) | `prototypes/explorer-react/` | `code/universe-explorer/` (ফিক্স-পূর্ববর্তী, আর্কাইভ) | ✅ যাচাইকৃত ২৬ নভে. ২০২৬: tsc ০ এরর, vitest ১/১, vite build সফল, ব্রাউজার-রানটাইম কার্যকর |
-| দিগন্ত প্রোটোটাইপ | `prototypes/dighonto/` | `code/digant-prototype/` (বিষয়বস্তু হুবহু একই, শুধু লাইন-এন্ডিং ভিন্ন) | ✅ স্ট্যাটিক সার্ভারে চালানো যায় |
-| স্কেল-কনসোল | `prototypes/cosmos-engine/cosmos-engine.html` | — | ✅ একক ফাইল |
-| Python ইঞ্জিন-রেফারেন্স | `COSMOS-Masterplan/code/engine-reference/python/` | রুট `annex/` (Markdown-ফেন্সযুক্ত অপরিষ্কার কপি — চালানো যায় না) | ⚠️ ক্যাননিক্যাল কপিও রেফারেন্স-মানের; প্যাকেজিং বাকি |
+| Explorer (React/TS) | `cosmos/explorer/` | `code/universe-explorer/` (আর্কাইভ); পুরনো `prototypes/explorer-react/` স্থানান্তরিত | ✅ ২৭ নভে. ২০২৬: tsc ০ এরর, vitest ১২/১২, vite build, Playwright e2e ৫/৫; ৯ ভিউ-মোড, Dual-Scope, Caveat, API-ক্লায়েন্ট |
+| দিগন্ত প্রোটোটাইপ | `cosmos/prototypes/dighonto/` | `code/digant-prototype/` (আর্কাইভ) | ✅ স্ট্যাটিক সার্ভারে চালানো যায় |
+| স্কেল-কনসোল | `cosmos/prototypes/cosmos-engine/cosmos-engine.html` | — | ✅ একক ফাইল |
+| Python ইঞ্জিন | `cosmos/engine/reference-python/` (প্যাকেজ `cosmos_engine`) | `code/engine-reference/python/` (সোর্স-সংরক্ষণ); `annex/` (লিগ্যাসি) | ✅ ২৭ নভে. ২০২৬: pip-package, pytest ২৩/২৩ (astropy 1e-6 গেটসহ), পরিচ্ছন্ন মডিউল |
+| ব্যাকএন্ড API | `cosmos/services/api/main.py` | — | ✅ FastAPI `/v1/` পূর্ণ সেট; লাইভ টেস্ট পাস |
+| ডেটা/স্কিমা/ভ্যালিডেশন | `cosmos/datasets/`, `cosmos/scientific-knowledge/`, `cosmos/validation/` | — | ✅ ingest-গেট ০ এরর; pipeline ১০/১০; acceptance ১০/১০ |
+| L0 সৌরজগৎ মডিউল | রিপো-রুট `src/` (নিজস্ব অ্যাপ) | — | ✅ build সফল; Explorer Local Scope থেকে handoff লিঙ্ক |

@@ -1,0 +1,101 @@
+{
+  "catalogue": {
+    "id": "cosmos-local-universe-seed",
+    "name": "COSMOS Local Universe seed catalogue (curated from masterplan s6 cited values)",
+    "data_version": "2026-11-27.1",
+    "license": "CC-BY-4.0 (compilation); individual values retain cited sources",
+    "note": "Seed catalogue for phases 1-4 development. Every measurement carries source + sigma or an explicit uncertainty_note. No fabricated uncertainties: where the cited source gives no sigma, sigma is null and evidence is UNC."
+  },
+  "objects": [
+    {"id": "milky-way", "name": "Milky Way (আকাশগঙ্গা)", "type": "galaxy", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical",
+     "ra_deg": null, "dec_deg": null, "position_note": "observer location",
+     "measurements": [
+       {"quantity": "galactocentric_solar_distance", "value": 8.277, "sigma": 0.031, "unit": "kpc", "method": "stellar orbits around Sgr A*", "source": "GRAVITY Collaboration 2022 via masterplan s17 phase-1 gate", "mass_definition": null},
+       {"quantity": "circular_velocity_solar", "value": 233.0, "sigma": 3.0, "unit": "km/s", "method": "Gaia DR3 rotation curve fits (indicative)", "source": "Gaia DR3 rotation-curve literature; indicative seed value", "mass_definition": null}
+     ],
+     "components": ["galactic-bar", "galactic-disk", "galactic-bulge", "spiral-arms", "stellar-halo", "sgr-a-star"]},
+    {"id": "galactic-bar", "name": "Galactic Bar", "type": "galaxy-component", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "parent": "milky-way", "measurements": [{"quantity": "half_length", "value": 2.5, "sigma": 0.5, "unit": "kpc", "method": "red-clump / VVV modelling (indicative)", "source": "Galactic structure literature; indicative seed value", "mass_definition": null}]},
+    {"id": "galactic-disk", "name": "Galactic Disk", "type": "galaxy-component", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "parent": "milky-way", "measurements": [{"quantity": "scale_length", "value": 2.6, "sigma": 0.5, "unit": "kpc", "method": "star-count modelling (indicative)", "source": "Galactic structure literature; indicative seed value", "mass_definition": null}]},
+    {"id": "galactic-bulge", "name": "Galactic Bulge", "type": "galaxy-component", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "parent": "milky-way", "measurements": []},
+    {"id": "spiral-arms", "name": "Spiral Arms (Scutum-Centaurus, Sagittarius, Local/Orion, Perseus)", "type": "galaxy-component", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "parent": "milky-way", "measurements": []},
+    {"id": "stellar-halo", "name": "Stellar Halo", "type": "galaxy-component", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "parent": "milky-way", "measurements": []},
+    {"id": "sgr-a-star", "name": "Sgr A*", "type": "supermassive-black-hole", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "parent": "milky-way",
+     "measurements": [{"quantity": "mass", "value": 4.3e6, "sigma": 0.2e6, "unit": "Msun", "method": "S-star orbits", "source": "GRAVITY / Gillessen et al. via EHT literature; indicative sigma", "mass_definition": "other"}]},
+    {"id": "solar-system", "name": "Solar System (L0)", "type": "star-system", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "parent": "milky-way",
+     "note": "Full L0 module lives in the repository-root app src/universe/layers/StarSystemLayer.ts + PlanetLayer.ts (Keplerian, 8 planets, 15 moons).",
+     "measurements": [{"quantity": "galactocentric_distance", "value": 8.277, "sigma": 0.031, "unit": "kpc", "method": "see milky-way", "source": "GRAVITY Collaboration 2022", "mass_definition": null}]},
+
+    {"id": "m31", "name": "Andromeda Galaxy (M31)", "type": "galaxy", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "ra_deg": 10.6847, "dec_deg": 41.2692,
+     "measurements": [{"quantity": "distance", "value": 0.752, "sigma": 0.027, "unit": "Mpc", "method": "TRGB / Cepheid distance modulus compilation", "source": "McConnachie 2012 (catalogue adopted for phase 2)", "mass_definition": null}]},
+    {"id": "m33", "name": "Triangulum Galaxy (M33)", "type": "galaxy", "evidence": "OBS", "confidence": "B", "boundary_kind": "physical", "ra_deg": 23.462, "dec_deg": 30.66,
+     "measurements": [{"quantity": "distance", "value": 0.84, "sigma": 0.04, "unit": "Mpc", "method": "TRGB compilation (indicative)", "source": "McConnachie 2012; indicative seed value", "mass_definition": null}]},
+    {"id": "lmc", "name": "Large Magellanic Cloud", "type": "galaxy", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "ra_deg": 80.894, "dec_deg": -69.756,
+     "measurements": [{"quantity": "distance", "value": 0.04959, "sigma": 0.00054, "unit": "Mpc", "method": "detached eclipsing binaries", "source": "Pietrzynski et al. 2019, Nature", "mass_definition": null}]},
+    {"id": "smc", "name": "Small Magellanic Cloud", "type": "galaxy", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "ra_deg": 13.187, "dec_deg": -72.829,
+     "measurements": [{"quantity": "distance", "value": 0.0624, "sigma": 0.001, "unit": "Mpc", "method": "detached eclipsing binaries (indicative sigma)", "source": "Graczyk et al. 2020; indicative seed value", "mass_definition": null}]},
+    {"id": "sagittarius-dsph", "name": "Sagittarius Dwarf Spheroidal", "type": "galaxy", "evidence": "OBS", "confidence": "B", "boundary_kind": "physical", "ra_deg": 283.76, "dec_deg": -30.48,
+     "measurements": [{"quantity": "distance", "value": 0.026, "sigma": 0.002, "unit": "Mpc", "method": "RR Lyrae / red clump (indicative)", "source": "Local Group compilations; indicative seed value", "mass_definition": null}]},
+    {"id": "fornax-dsph", "name": "Fornax Dwarf Spheroidal", "type": "galaxy", "evidence": "OBS", "confidence": "B", "boundary_kind": "physical", "ra_deg": 40.0, "dec_deg": -34.45,
+     "measurements": [{"quantity": "distance", "value": 0.147, "sigma": 0.012, "unit": "Mpc", "method": "TRGB compilation (indicative)", "source": "McConnachie 2012; indicative seed value", "mass_definition": null}]},
+
+    {"id": "local-group", "name": "Local Group", "type": "group", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent",
+     "members": ["milky-way", "m31", "m33", "lmc", "smc", "sagittarius-dsph", "fornax-dsph"],
+     "measurements": [
+       {"quantity": "lg_to_cmb_velocity", "value": 620.0, "sigma": 15.0, "unit": "km/s", "method": "dipole-corrected LG barycentre velocity", "source": "masterplan s3.4 (620-627 km/s, l~272-276, b~29-30)", "mass_definition": null, "direction_galactic": {"l_deg": 274.0, "b_deg": 29.5, "sigma_deg": 15.0}}
+     ]},
+    {"id": "local-sheet", "name": "Local Sheet", "type": "structure", "evidence": "REC", "confidence": "C", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "width", "value": 34.0, "sigma": null, "unit": "Mly", "method": "galaxy distribution flattening c/a=0.16", "source": "masterplan s6.4 (no sigma quoted in source)", "mass_definition": null, "uncertainty_note": "sigma not quoted in cited source - do not fabricate"}],
+     "council_of_giants": ["NGC 253", "Circinus", "NGC 4945", "Centaurus A (NGC 5128)", "M83", "M64", "M94", "M81", "M82", "IC 342", "Maffei 1", "Maffei 2"]},
+    {"id": "local-void", "name": "Local Void", "type": "void", "evidence": "REC", "confidence": "C", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "local_expansion_push", "value": 259.0, "sigma": null, "unit": "km/s", "method": "flow-field modelling (~259-260 km/s)", "source": "masterplan s6.4 (range given, no formal sigma)", "mass_definition": null, "uncertainty_note": "range 259-260 km/s in source; no formal sigma"}]},
+
+    {"id": "virgo-cluster", "name": "Virgo Cluster", "type": "cluster", "evidence": "OBS", "confidence": "A", "boundary_kind": "model-dependent", "ra_deg": 187.70, "dec_deg": 12.34,
+     "measurements": [
+       {"quantity": "distance", "value": 16.5, "sigma": 0.1, "unit": "Mpc", "method": "surface-brightness fluctuations / ACS Virgo survey", "source": "Mei et al. 2007 via masterplan s6.4", "mass_definition": null},
+       {"quantity": "galaxy_count", "value": 1650.0, "sigma": null, "unit": "count", "method": "catalogue count 1300-2000 range midpoint", "source": "masterplan s6.4 (range 1300-2000)", "mass_definition": null, "uncertainty_note": "range in source; midpoint stored, sigma not fabricated"}
+     ],
+     "subclusters": ["Virgo A (M87)", "Virgo B (M49)", "Virgo C (M60)"]},
+    {"id": "m87", "name": "M87 (Virgo A)", "type": "galaxy", "evidence": "OBS", "confidence": "A", "boundary_kind": "physical", "parent": "virgo-cluster", "ra_deg": 187.514, "dec_deg": 12.314,
+     "measurements": [{"quantity": "smbh_mass", "value": 6.5e9, "sigma": 0.7e9, "unit": "Msun", "method": "EHT shadow + stellar dynamics", "source": "Event Horizon Telescope Collaboration 2019 via masterplan s6.4", "mass_definition": "other"}]},
+    {"id": "fornax-cluster", "name": "Fornax Cluster", "type": "cluster", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent", "ra_deg": 54.62, "dec_deg": -35.45,
+     "measurements": [
+       {"quantity": "distance", "value": 20.0, "sigma": null, "unit": "Mpc", "method": "approximate distance in cited summary", "source": "masterplan s6.4 (~20 Mpc, no sigma quoted)", "mass_definition": null, "uncertainty_note": "sigma not quoted in cited source"},
+       {"quantity": "mass", "value": 7e13, "sigma": null, "unit": "Msun", "method": "cluster mass estimate (definition not stated in source)", "source": "masterplan s6.4", "mass_definition": "other", "uncertainty_note": "mass definition and sigma not stated in cited source - flagged by ingest gate as warning, not silently accepted"}
+     ]},
+    {"id": "virgo-supercluster", "name": "Virgo (Local) Supercluster", "type": "supercluster", "evidence": "REC", "confidence": "C", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "mass", "value": 1.48e15, "sigma": null, "unit": "Msun", "method": "supercluster mass estimate (definition not stated in source)", "source": "masterplan s6.4", "mass_definition": "other", "uncertainty_note": "sigma/definition not stated in cited source"}]},
+
+    {"id": "laniakea", "name": "Laniakea Supercluster", "type": "supercluster", "evidence": "REC", "confidence": "C", "boundary_kind": "flow-defined",
+     "definition": "velocity watershed (Tully et al. 2014) - boundary is a probability map, not a spatial surface (decision C-register)",
+     "sub_basins": ["Virgo", "Hydra-Centaurus", "Pavo-Indus", "Southern Supercluster (Fornax-Dorado-Eridanus)"],
+     "measurements": [
+       {"quantity": "diameter", "value": 160.0, "sigma": null, "unit": "Mpc", "method": "watershed basin extent (~520 Mly)", "source": "Tully et al. 2014 via masterplan s6.4", "mass_definition": null, "uncertainty_note": "approximate extent; boundary probabilistic"},
+       {"quantity": "mass", "value": 1e17, "sigma": null, "unit": "Msun", "method": "basin mass estimate (definition not stated)", "source": "masterplan s6.4", "mass_definition": "other", "uncertainty_note": "order-of-magnitude in source"}
+     ]},
+    {"id": "great-attractor", "name": "Great Attractor / Norma (Abell 3627)", "type": "structure", "evidence": "REC", "confidence": "C", "boundary_kind": "flow-defined",
+     "measurements": [{"quantity": "distance", "value": 65.0, "sigma": null, "unit": "Mpc", "method": "flow-field inference, Zone-of-Avoidance obscured (~150-250 Mly range midpoint)", "source": "masterplan s6.4", "mass_definition": null, "uncertainty_note": "range in source; ZoA caveat applies"}]},
+    {"id": "shapley", "name": "Shapley Supercluster", "type": "supercluster", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "distance", "value": 195.0, "sigma": null, "unit": "Mpc", "method": "redshift distance z~0.048 (190-200 Mpc range)", "source": "masterplan s6.4 table", "mass_definition": null, "uncertainty_note": "range in source"}]},
+    {"id": "perseus-pisces", "name": "Perseus-Pisces Supercluster", "type": "supercluster", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "distance", "value": 70.0, "sigma": null, "unit": "Mpc", "method": "redshift distance (~250 Mly)", "source": "masterplan s6.4 table", "mass_definition": null, "uncertainty_note": "approximate in source"}]},
+    {"id": "coma-supercluster", "name": "Coma Supercluster", "type": "supercluster", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "distance", "value": 99.5, "sigma": null, "unit": "Mpc", "method": "redshift distance (99-100 Mpc)", "source": "masterplan s6.4 table", "mass_definition": null, "uncertainty_note": "range in source"}]},
+    {"id": "hercules", "name": "Hercules Superclusters", "type": "supercluster", "evidence": "OBS", "confidence": "B", "boundary_kind": "model-dependent",
+     "measurements": [{"quantity": "mass", "value": 2.1e15, "sigma": 0.2e15, "unit": "Msun", "method": "supercluster mass estimate", "source": "masterplan s6.4 table (2.1 +- 0.2)", "mass_definition": "other", "uncertainty_note": "mass definition not stated in cited source"}]}
+  ],
+  "scale_ladder": [
+    {"level": "L0", "name": "Solar System", "module": "root app StarSystemLayer/PlanetLayer"},
+    {"level": "L1", "name": "Local Bubble / stellar neighbourhood"},
+    {"level": "L2", "name": "Galactic neighbourhood"},
+    {"level": "L3", "name": "Milky Way"},
+    {"level": "L4", "name": "Milky Way subgroup"},
+    {"level": "L5", "name": "Local Group"},
+    {"level": "L6", "name": "Local Sheet / Local Volume"},
+    {"level": "L7", "name": "Local complex"},
+    {"level": "L8", "name": "Virgo Supercluster"},
+    {"level": "L9", "name": "Laniakea"},
+    {"level": "L10", "name": "Neighbouring superclusters / Pisces-Cetus"},
+    {"level": "L11", "name": "Great walls / KBC void scale"},
+    {"level": "L12", "name": "Observable Universe"}
+  ]
+}

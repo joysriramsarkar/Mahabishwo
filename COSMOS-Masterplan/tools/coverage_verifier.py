@@ -51,10 +51,13 @@ check("legacy HTML extraction exists", legacy.exists(),
 code_files = [p for p in (BASE / "code").rglob("*") if p.is_file()]
 check("code/ contains 101 files", len(code_files) == 101, f"(actual: {len(code_files)})")
 
-# 5. canonical working copies
-for rel in ["prototypes/explorer-react/package.json",
-            "prototypes/dighonto/app.js",
-            "prototypes/cosmos-engine/cosmos-engine.html",
+# 5. canonical working copies (moved into cosmos/ monorepo, 27 Nov 2026, ADR-0001)
+for rel in ["cosmos/explorer/package.json",
+            "cosmos/prototypes/dighonto/app.js",
+            "cosmos/prototypes/cosmos-engine/cosmos-engine.html",
+            "cosmos/engine/reference-python/src/cosmos_engine/parameters.py",
+            "cosmos/services/api/main.py",
+            "cosmos/scientific-knowledge/schema/001_initial.sql",
             "annex/python-engine/cosmology.py"]:
     check(f"canonical copy exists: {rel}", (ROOT / rel).exists())
 

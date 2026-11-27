@@ -1,0 +1,53 @@
+Metadata-Version: 2.4
+Name: cosmos-engine
+Version: 0.1.0
+Summary: COSMOS reference cosmology / IC / PM / light-cone engine (educational reference implementation; production solver is C++20/CUDA per masterplan s14.2)
+License: Apache-2.0
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: scipy>=1.11
+Requires-Dist: astropy>=6.0
+Requires-Dist: pyarrow>=14
+Provides-Extra: healpix
+Requires-Dist: healpy>=1.16; extra == "healpix"
+Provides-Extra: api
+Requires-Dist: fastapi>=0.110; extra == "api"
+Requires-Dist: uvicorn>=0.29; extra == "api"
+Requires-Dist: duckdb>=0.10; extra == "api"
+Requires-Dist: pydantic>=2; extra == "api"
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: httpx>=0.27; extra == "dev"
+
+# cosmos-engine — Reference Python Engine
+
+মাস্টারপ্ল্যান ভাগ ৮ (G0–G8) ও ১৬.২ অনুযায়ী আচরণগত স্পেসিফিকেশন (behavioural spec)।
+উৎপাদন সলভার C++20/CUDA/MPI (ভাগ ১৪.২) — এই প্যাকেজ শিক্ষামূলক রেফারেন্স ও ভ্যালিডেশন-ভিত্তি।
+
+## উৎস-মানচিত্র (COSMOS-Masterplan/code/engine-reference/python/)
+
+| মূল ফাইল | এই প্যাকেজে | সংশোধন |
+|---|---|---|
+| `01_background_cosmology.py` | `cosmos_engine/cosmology.py` + `parameters.py` | import-এ demo সরানো; ParameterSet যুক্ত |
+| `02_gaussian_ic_2lpt.py` | `cosmos_engine/ic.py` | `np.trapz`→`trapezoid`; order=1-এ `psi2=None` crash ঠিক |
+| `03_pm_nbody_cola.py` | `cosmos_engine/pm.py` | হারানো `import numpy` যুক্ত |
+| `04_lightcone_shell_writer.py` | `cosmos_engine/lightcone.py` | `np`/`C_KMS` import, outdir তৈরি, healpy ঐচ্ছিক |
+| `05_hod_photometry.py` | `cosmos_engine/hod.py` | `np` import; array-safe M/L |
+| `06_cmb_lensing_tsz_healpy.py` | `cosmos_engine/cmb.py` | `np` import; healpy ঐচ্ছিক |
+| `07_transient_sampling.py` | `cosmos_engine/transients.py` | `np` import |
+| `08/11_api_*.py` | `cosmos/services/api/` | `/v1/` পূর্ণ API-তে সম্প্রসারিত |
+| `10_observer_frame_astropy.py` | `cosmos_engine/observer.py` | হুবহু (পরিষ্কার ছিল) |
+| `12_simulation_orchestration_pseudocode.py` | `cosmos_engine/orchestration.py` | অবস্থা-মেশিনসহ বাস্তবায়িত |
+| `lightcone_record_schema.py` (সিনট্যাক্স-ভুল) | `cosmos_engine/schema.py` | সত্যিকারের `pyarrow.Schema` |
+
+## ব্যবহার
+
+```python
+from cosmos_engine import ParameterSet, Cosmology
+cosmo = Cosmology(ParameterSet.named("Planck18"))
+print(cosmo.D_L(1.0))  # Mpc
+# দ্বৈত H0 ensemble (বাধ্যতামূলক, U15):
+for ps in ParameterSet.dual_h0_ensemble():
+    print(ps.name, Cosmology(ps).chi(1.0))
+```

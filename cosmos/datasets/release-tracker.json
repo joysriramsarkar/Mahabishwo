@@ -1,0 +1,15 @@
+{
+  "description": "Survey release tracker (masterplan s6.5, checklist E). Status checked 2026-11-27. Future releases are NOT ingested until public; no placeholder data is fabricated.",
+  "releases": [
+    {"catalogue": "Gaia DR4", "expected": "2026-12-02", "status": "upcoming", "access": "ESA TAP/ADQL regional queries - full 400-500 TB download prohibited by design", "note": "Ingest adapter must use TAP region queries only (masterplan checklist E)."},
+    {"catalogue": "Gaia DR3", "expected": "2022-06-13", "status": "available", "access": "ESA archive TAP"},
+    {"catalogue": "DESI DR2", "expected": "2025", "status": "available", "access": "DESI data portal"},
+    {"catalogue": "Euclid DR1", "expected": "2026", "status": "upcoming", "access": "ESA Euclid archive"},
+    {"catalogue": "Rubin LSST DP", "expected": "2026", "status": "upcoming", "access": "Rubin Science Platform"},
+    {"catalogue": "Roman (Nancy Grace)", "expected": "2027+", "status": "upcoming", "access": "TBD"},
+    {"catalogue": "Cosmicflows-4", "expected": "2022", "status": "available", "access": "EDD catalogue; 55,877 galaxies - flow model input for Laniakea (M6)"},
+    {"catalogue": "McConnachie Local Group compilation", "expected": "2012", "status": "available", "access": "Published tables; phase-2 distance source"},
+    {"catalogue": "Planck 2018", "expected": "2020", "status": "available", "access": "Planck Legacy Archive"},
+    {"catalogue": "LIGO/Virgo/KAGRA GWTC", "expected": "rolling", "status": "available", "access": "GWOSC; transient adapter input"}
+  ]
+}
