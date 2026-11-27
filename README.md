@@ -50,20 +50,37 @@
 - কসমিক টাইমলাইন (বিগ ব্যাং → ১৩.৮ বিলিয়ন বছর), রাডার মিনিম্যাপ, সার্চ, ফটো মোড, অ্যাম্বিয়েন্ট সাউন্ড
 - সম্পূর্ণ বাংলা UI (Hind Siliguri ফন্ট)
 
-## 🚀 চালানো (Run Locally)
+## 🚀 চালানো ও মনোরিপো কমান্ড (Unified Run & Tests)
+
+মূল **Mahabishwo ৩ডি স্টুডিও** (`/`) ও **COSMOS সায়েন্টিফিক এক্সপ্লোরার** (`/cosmos/`) এখন একই সিঙ্গেল-অরিজিন অ্যাপে একীভূত। রুট থেকে সব চালানো যায় (বিস্তারিত: [`ARCHITECTURE.md`](ARCHITECTURE.md)):
 
 ```bash
 npm install
-npm run dev
+npm run dev          # একই সাথে ৩ডি স্টুডিও (/) ও COSMOS Explorer (/cosmos/) চালু করে → http://localhost:3000
 ```
 
-ব্রাউজারে খুলুন: http://localhost:3000
+- **৩ডি স্টুডিও (L0)**: `http://localhost:3000/` (টুলবারের `🔬 COSMOS` বাটনে ক্লিক করে বিজ্ঞান ল্যাবে যান)
+- **COSMOS · দিগন্ত (Explorer)**: `http://localhost:3000/cosmos/` (টপবারের `🌌 ৩ডি স্টুডিও` বাটনে ফিরে আসুন)
+- **COSMOS FastAPI ব্যাকএন্ড** (ঐচ্ছিক, `/v1/*` স্বয়ংক্রিয়ভাবে Vite থেকে প্রক্সি হয়):
 
-প্রোডাকশন বিল্ড:
+```bash
+npm run dev:api      # http://127.0.0.1:8000
+```
+
+প্রোডাকশন বিল্ড ও প্রিভিউ (দুটি অ্যাপ একসাথে `dist/` ও `dist/cosmos/`-এ তৈরি হয়):
 
 ```bash
 npm run build
-npm run preview
+npm run preview      # http://localhost:3000/ এবং http://localhost:3000/cosmos/
+```
+
+টেস্ট স্যুইট:
+
+```bash
+npm run test:unit     # রুট L0 পদার্থবিদ্যা, ONNX fallback, deep-link ও প্রোভেন্যান্স টেস্ট
+npm run test:explorer # COSMOS Explorer ইউনিট টেস্ট (Vitest)
+npm run test:python   # COSMOS Python ইঞ্জিন ও API টেস্ট (pytest)
+npm run test:all      # সম্পূর্ণ টাইপচেক + সব টেস্ট
 ```
 
 ## 🎮 নিয়ন্ত্রণ (Controls)

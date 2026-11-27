@@ -277,7 +277,7 @@ export class ControlsPanel {
       btn.addEventListener('click', (e) => {
         const q = (e.currentTarget as HTMLElement).dataset.quality as QualityLevel;
         this.state.quality = q;
-        this.sceneManager.engine.setQuality(q);
+        this.sceneManager.engine.setQuality(q, this.state.bloom);
         this.render();
         this.container.querySelector<HTMLElement>(`[data-quality="${q}"]`)?.focus();
       });
@@ -304,5 +304,9 @@ export class ControlsPanel {
       playBtn.textContent = this.state.isPlaying ? '⏸ বিরতি দিন' : '▶ চালু করুন';
       playBtn.setAttribute('aria-pressed', String(this.state.isPlaying));
     }
+  }
+
+  public syncQuality(): void {
+    this.render();
   }
 }

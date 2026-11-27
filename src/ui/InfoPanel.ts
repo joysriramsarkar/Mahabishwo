@@ -14,10 +14,44 @@ import {
   SEMI_MAJOR_AU,
   STAR_MASS_SOLAR,
   AU_KM,
-  EARTH_MEAN_SPEED_KMS,
 } from '../data/cosmicData';
 import { toBn } from '../utils/math';
 import { eventBus } from '../core/EventBus';
+import { computeVisVivaSpeedKms } from '../physics/orbitalMechanics';
+
+type L0EvidenceKind = 'OBS' | 'REC' | 'SIM' | 'MODEL';
+
+interface ProvenanceSpec {
+  evidence: L0EvidenceKind;
+  evidenceLabel: string;
+  uncertaintyNote: string;
+  sourceName: string;
+  sourceUrl: string;
+}
+
+function renderProvenanceFooter(spec: ProvenanceSpec): string {
+  const badgeStyle =
+    spec.evidence === 'OBS'
+      ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+      : spec.evidence === 'REC'
+      ? 'bg-indigo-500/20 text-indigo-200 border-indigo-400/40'
+      : spec.evidence === 'SIM'
+      ? 'bg-sky-500/20 text-sky-200 border-sky-400/40'
+      : 'bg-amber-500/20 text-amber-200 border-amber-400/40';
+
+  return `
+    <div class="mt-4 pt-2.5 border-t border-white/10 space-y-1.5 text-[11px]">
+      <div class="flex items-center justify-between gap-2">
+        <span class="px-1.5 py-0.5 rounded border text-[10px] font-mono font-semibold ${badgeStyle}">${spec.evidence} • ${spec.evidenceLabel}</span>
+        <a href="${spec.sourceUrl}" target="_blank" rel="noopener noreferrer"
+          class="text-sky-300 hover:text-sky-200 underline underline-offset-2 truncate max-w-[175px]">
+          ${spec.sourceName} ↗
+        </a>
+      </div>
+      <p class="text-[10px] text-slate-400 leading-snug">${spec.uncertaintyNote}</p>
+    </div>
+  `;
+}
 
 export class InfoPanel {
   private container: HTMLElement;
@@ -58,6 +92,9 @@ export class InfoPanel {
     let telemetryPlanet: { systemId: string; planetId: string } | null = null;
     let sourceName = 'NASA Astrophysics';
     let sourceUrl = 'https://science.nasa.gov/universe/';
+    let evidence: L0EvidenceKind = 'REC';
+    let evidenceLabel = 'পুনর্গঠিত ক্যাটালগ';
+    let uncertaintyNote = 'দৃশ্যমানতা ও একটানা জুমের জন্য লগারিদমিক স্কেল; প্রকৃত মান প্যানেল ও COSMOS ল্যাবে (±σ সহ) প্রদর্শিত।';
 
     switch (this.state.currentScale) {
       case ScaleLevel.OBSERVABLE_UNIVERSE:
@@ -79,6 +116,9 @@ export class InfoPanel {
         }));
         sourceName = 'ESA Planck Mission';
         sourceUrl = 'https://www.esa.int/Science_Exploration/Space_Science/Planck';
+        evidence = 'OBS';
+        evidenceLabel = 'Planck PR4 + H₀ রেঞ্জ';
+        uncertaintyNote = 'বয়স ১৩.৭৯৭ ± ০.০২৩ Gyr (Planck18)। দূরত্ব স্কেলে H₀ টেনশন (±৭%, ৬৭.৭ বনাম ৭৩.০) বিদ্যমান।';
         break;
 
       case ScaleLevel.COSMIC_WEB:
@@ -97,6 +137,11 @@ export class InfoPanel {
           color: sc.color,
           onClick: () => this.sceneManager.focusSupercluster(sc.id),
         }));
+        sourceName = 'Cosmicflows-4 / SDSS';
+        sourceUrl = 'https://edd.ifa.hawaii.edu/';
+        evidence = 'REC';
+        evidenceLabel = 'পুনর্গঠিত বেগক্ষেত্র';
+        uncertaintyNote = 'সুপারক্লাস্টারের সীমানা প্রবাহ-নির্ভর (flow-defined); দূরত্ব অনিশ্চয়তা সাধারণত ±৮–১৫%।';
         break;
 
       case ScaleLevel.GALAXY_CLUSTER:
@@ -109,6 +154,11 @@ export class InfoPanel {
           { label: 'বৃহত্তম সদস্য', value: 'অ্যান্ড্রোমিডা (M31)' },
           { label: 'সম্ভাব্য সংঘর্ষ', value: '~৪.৫–১০ বিলিয়ন বছর' },
         ];
+        sourceName = 'McConnachie / Gaia DR3';
+        sourceUrl = 'https://www.cosmos.esa.int/web/gaia';
+        evidence = 'OBS';
+        evidenceLabel = 'অবজারভেশন ক্যাটালগ';
+        uncertaintyNote = 'M31 দূরত্ব ২.৫৩৭ ± ০.০৮ Mly (Cepheid/TRGB); IGM প্লাজমা সেতু দৃশ্যমানতার জন্য হাইলাইটকৃত।';
         listTitle = 'সদস্য ছায়াপথে প্রবেশ ও সংঘর্ষ';
         listItems = [
           {
@@ -138,6 +188,22 @@ export class InfoPanel {
         subtitle = `${mw.name} • ${mw.type === 'barred-spiral' ? 'Barred Spiral' : mw.type === 'spiral' ? 'Spiral Galaxy' : mw.type === 'irregular' ? 'Irregular Galaxy' : 'Dwarf Galaxy'}`;
         desc = `${mw.descriptionBn} সর্পিল বাহুতে চলছে সুপারনোভা বিস্ফোরণ ও O/B নীল দানব থেকে নিউট্রন তারার জীবনচক্র।`;
         accent = mw.color;
+        if (mw.id === 'milkyway') {
+          sourceName = 'ESA Gaia DR3 / EHT Sgr A*';
+          sourceUrl = 'https://www.cosmos.esa.int/web/gaia';
+        } else if (mw.id === 'andromeda') {
+          sourceName = 'NASA/JPL & Hubble PHAT (M31)';
+          sourceUrl = 'https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-31/';
+        } else if (mw.id === 'triangulum') {
+          sourceName = 'NASA/IPAC NED (M33)';
+          sourceUrl = 'https://ned.ipac.caltech.edu/';
+        } else {
+          sourceName = 'ESA Gaia DR3 Magellanic Survey';
+          sourceUrl = 'https://www.cosmos.esa.int/web/gaia';
+        }
+        evidence = 'OBS';
+        evidenceLabel = 'গ্যালাক্সি ক্যাটালগ + প্রসিডিউরাল ডিস্ক';
+        uncertaintyNote = 'কেন্দ্রীয় ব্ল্যাক হোল ভর ও ব্যাস ক্যাটালগ-ভিত্তিক (±১০–১৫%); সর্পিল কণা ও সুপারনোভা রেন্ডার প্রতীকী।';
         stats = [
           { label: 'ব্যাস', value: `${toBn(mw.diameterKly)},০০০ আলোকবর্ষ` },
           { label: 'নক্ষত্র সংখ্যা', value: `${toBn(mw.starCountBillions)} বিলিয়ন+` },
@@ -218,6 +284,9 @@ export class InfoPanel {
         stats = sys.stats;
         sourceName = sys.sourceName;
         sourceUrl = sys.sourceUrl;
+        evidence = 'OBS';
+        evidenceLabel = 'NASA/JPL Keplerian';
+        uncertaintyNote = 'ভিজ্যুয়াল কক্ষপথের ব্যাসার্ধ ও গ্রহের আকার দৃশ্যমানতার জন্য সংকুচিত; কক্ষীয় কাল ও Kepler উৎকেন্দ্রিকতা বাস্তব।';
         listTitle = 'গ্রহসমূহ (ক্লিক করে কাছে যান)';
         listItems = sys.planets.map((p) => ({
           label: p.nameBn,
@@ -238,6 +307,12 @@ export class InfoPanel {
         stats = p.stats;
         sourceName = p.sourceName;
         sourceUrl = p.sourceUrl;
+        evidence = 'OBS';
+        evidenceLabel = sys.id === 'solar' ? 'NASA JPL + USGS টেক্সচার' : 'NASA Exoplanet Archive';
+        uncertaintyNote =
+          sys.id === 'solar'
+            ? 'আহ্নিক ঘূর্ণন, অক্ষ-কাত ও উপগ্রহ-পিরিয়ড বাস্তব; উপগ্রহ দূরত্ব গ্রহের পাশে দৃশ্যমান রাখার জন্য সংকুচিত।'
+            : 'এক্সোপ্ল্যানেট পৃষ্ঠের টেক্সচার ও বায়ুমণ্ডল প্রসিডিউরাল মডেল; ভর/ব্যাসার্ধ পর্যবেক্ষিত ট্রানজিট ও RV অনিশ্চয়তাযুক্ত।';
         godsEye = { host: sys.id, planetId: p.id, color: p.color };
         moonList = PLANET_MOONS[p.id] ?? [];
         telemetryPlanet = { systemId: sys.id, planetId: p.id };
@@ -350,13 +425,13 @@ export class InfoPanel {
           : ''
       }
 
-      <div class="mt-4 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
-        <span class="text-slate-400">তথ্যসূত্র:</span>
-        <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer"
-          class="text-sky-300 hover:text-sky-200 underline underline-offset-2 truncate max-w-[180px]">
-          ${sourceName} ↗
-        </a>
-      </div>
+      ${renderProvenanceFooter({
+        evidence,
+        evidenceLabel,
+        uncertaintyNote,
+        sourceName,
+        sourceUrl,
+      })}
     `;
 
     this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
@@ -470,13 +545,13 @@ export class InfoPanel {
           : ''
       }
 
-      <div class="mt-4 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
-        <span class="text-slate-400">তথ্যসূত্র:</span>
-        <a href="${sc.sourceUrl}" target="_blank" rel="noopener noreferrer"
-          class="text-sky-300 hover:text-sky-200 underline underline-offset-2 truncate max-w-[180px]">
-          ${sc.sourceName} ↗
-        </a>
-      </div>
+      ${renderProvenanceFooter({
+        evidence: 'REC',
+        evidenceLabel: 'সুপারক্লাস্টার পুনর্গঠন',
+        uncertaintyNote: 'প্রবাহ-নির্ভর (flow-defined) সীমানা; দূরত্ব ±১০–১৫% ও মোট ভরে ডার্ক ম্যাটার অনুমান অন্তর্ভুক্ত।',
+        sourceName: sc.sourceName,
+        sourceUrl: sc.sourceUrl,
+      })}
     `;
 
     this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
@@ -625,6 +700,14 @@ export class InfoPanel {
           ↻ সংঘর্ষ পুনরায় শুরু করুন
         </button>
       </div>
+
+      ${renderProvenanceFooter({
+        evidence: 'SIM',
+        evidenceLabel: 'Physics-Informed MLP সারোগেট',
+        uncertaintyNote: 'Newton+NFW হ্যালো সমীকরণে ট্রেন করা ONNX মডেল (Cosine sim ≥৯৮.৩%); Exact Newton মোডের সাথে সরাসরি তুলনাযোগ্য।',
+        sourceName: 'NASA M31 Merger Study',
+        sourceUrl: 'https://science.nasa.gov/mission/hubble/',
+      })}
     `;
 
     this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
@@ -737,7 +820,7 @@ export class InfoPanel {
     const rAU = (rScene / item.data.orbitRadius) * aAU;
     // vis-viva: v = v⊕ · √(M★ · (2/r − 1/a)) — speeds up at perihelion.
     const mStar = STAR_MASS_SOLAR[sysId] ?? 1;
-    const speed = EARTH_MEAN_SPEED_KMS * Math.sqrt(mStar * (2 / rAU - 1 / aAU));
+    const speed = computeVisVivaSpeedKms(rAU, aAU, mStar);
 
     const croreKm = (rAU * AU_KM) / 1e7;
     const distText =

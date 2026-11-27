@@ -1,3 +1,5 @@
+import { QualityLevel } from '../core/types';
+
 /**
  * HDR post-processing pipeline.
  * RenderPass → Bloom → Vignette → Chromatic Aberration → ACES Tone Mapping.
@@ -119,6 +121,19 @@ export class PostPipeline {
 
   public setBloom(intensity: number): void {
     this.bloom.intensity = intensity;
+  }
+
+  public setQualityMode(quality: QualityLevel, targetBloom: number): void {
+    if (quality === 'low') {
+      this.chromatic.offset.set(0, 0);
+      this.bloom.intensity = targetBloom * 0.7;
+    } else if (quality === 'medium') {
+      this.chromatic.offset.set(0.00012, 0.00016);
+      this.bloom.intensity = targetBloom * 0.9;
+    } else {
+      this.chromatic.offset.set(0.00018, 0.00025);
+      this.bloom.intensity = targetBloom;
+    }
   }
 
   public setVignette(offset: number, darkness: number): void {

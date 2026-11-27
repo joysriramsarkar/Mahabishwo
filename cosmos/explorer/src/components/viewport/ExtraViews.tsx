@@ -5,8 +5,8 @@ import { Viewport3D } from './Viewport3D';
 import { TimeController } from '@/components/panels/TimeController';
 import { CompareView } from '@/components/compare/CompareView';
 import { massFunction, redshiftHistogram, correlationFunction, chiSquare, histogram } from '@/lib/statistics';
-import { PARAM_SETS, comovingDistanceMpc, lookbackGyr } from '@/lib/cosmology';
-import { distanceRangeForH0 } from '@/lib/cosmology';
+import { PARAM_SETS, comovingDistanceMpc, lookbackGyr, distanceRangeForH0 } from '@/lib/cosmology';
+import { isUnifiedCosmosMount, resolveLocalAppUrl } from '@/lib/l0Url';
 
 /** Mode 5 - Comoving Volume: outside view, permanent unphysical-viewpoint banner. */
 export function ComovingView() {
@@ -227,6 +227,8 @@ export function ModelLabView() {
 /** Local Scope (Dual-Scope s15.1 rule 7): full MW + L0 handoff. */
 export function LocalScopeView() {
   const [showL0, setShowL0] = useState(false);
+  const l0Url = resolveLocalAppUrl();
+  const unifiedOrigin = isUnifiedCosmosMount();
   const { data } = useAllObjects();
   const local = useMemo(() => {
     return (data ?? []).filter((o) => {
@@ -246,25 +248,33 @@ export function LocalScopeView() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="font-medium">L0 সৌরজগৎ মডিউল (রুট অ্যাপ)</div>
           <button type="button" onClick={() => setShowL0((v) => !v)}
-            className="min-h-11 rounded-sm border border-accent/50 px-3 text-[12px] text-accent">
+            className="min-h-11 rounded-sm border border-accent/50 bg-base px-3 text-[12px] text-accent">
             {showL0 ? 'L0 বন্ধ করুন' : 'L0 এখানেই খুলুন'}
           </button>
+          <a href={l0Url}
+            className="inline-flex min-h-11 items-center rounded-sm border border-border-subtle bg-base px-3 text-[12px] text-ink hover:border-accent hover:text-accent">
+            পূর্ণ স্ক্রিনে খুলুন ↗
+          </a>
         </div>
         <p className="mt-1 text-ink-subtle">
-          Keplerian সৌরজগৎ (৮ গ্রহ, ১৫ চাঁদ, বলয়, বাসযোগ্য অঞ্চল)। URL পরিবর্তন: <span className="font-mono">VITE_LOCAL_APP_URL</span>।
-          মডিউল: <span className="font-mono">src/universe/layers/StarSystemLayer.ts + PlanetLayer.ts</span>।
+          Keplerian সৌরজগৎ (৮ গ্রহ, ১৫ চাঁদ, বলয়, বাসযোগ্য অঞ্চল)। {unifiedOrigin
+            ? <>একীভূত সার্ভার: <span className="font-mono">/</span> (same origin)।</>
+            : <>URL পরিবর্তন: <span className="font-mono">VITE_LOCAL_APP_URL</span>।</>}
+          {' '}মডিউল: <span className="font-mono">src/universe/layers/StarSystemLayer.ts + PlanetLayer.ts</span>।
         </p>
         {showL0 && (
           <div className="mt-3 overflow-hidden rounded-md border border-border-subtle">
             <iframe
               title="COSMOS L0 Solar System"
-              src={(import.meta as unknown as { env?: Record<string, string> }).env?.VITE_LOCAL_APP_URL ?? 'http://localhost:3000'}
+              src={l0Url}
               className="h-[60dvh] w-full bg-base"
               loading="lazy"
               referrerPolicy="no-referrer"
             />
             <p className="px-3 py-2 text-[11px] text-ink-muted">
-              L0 আলাদা origin-এ চলছে। না খুললে রিপো-রুটে <span className="font-mono">npm run dev</span> চালান।
+              {unifiedOrigin
+                ? <>একই origin-এ L0 স্টুডিও (<span className="font-mono">{l0Url}</span>) সরাসরি লোড হয়েছে।</>
+                : <>L0 আলাদা origin-এ চলছে (<span className="font-mono">{l0Url}</span>)। না খুললে রিপো-রুটে <span className="font-mono">npm run dev</span> চালান।</>}
             </p>
           </div>
         )}

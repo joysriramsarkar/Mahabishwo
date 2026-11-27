@@ -65,13 +65,16 @@ export class Engine {
     this.pipeline = new PostPipeline(this.renderer, this.scene, this.camera);
   }
 
-  public setQuality(quality: QualityLevel): void {
+  public setQuality(quality: QualityLevel, bloomIntensity?: number): void {
     const pr =
       quality === 'high' ? Math.min(window.devicePixelRatio || 1, 2) :
       quality === 'medium' ? Math.min(window.devicePixelRatio || 1, 1.5) :
       Math.min(window.devicePixelRatio || 1, 1);
     this.renderer.setPixelRatio(pr);
     this.pipeline.setSize(window.innerWidth, window.innerHeight);
+    if (typeof bloomIntensity === 'number') {
+      this.pipeline.setQualityMode(quality, bloomIntensity);
+    }
   }
 
   public resize(): void {

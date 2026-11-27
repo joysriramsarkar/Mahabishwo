@@ -50,6 +50,27 @@ function ortRuntimePlugin(): Plugin {
         res.end(readFileSync(fullPath));
       });
     },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const cleanUrl = req.url?.split('?')[0] ?? '';
+        if (cleanUrl === '/cosmos') {
+          res.statusCode = 301;
+          res.setHeader('Location', '/cosmos/');
+          res.end();
+          return;
+        }
+        if (cleanUrl === '/cosmos/') {
+          const cosmosHtml = resolve(__dirname, config.build.outDir, 'cosmos', 'index.html');
+          if (existsSync(cosmosHtml)) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.end(readFileSync(cosmosHtml));
+            return;
+          }
+        }
+        next();
+      });
+    },
     closeBundle() {
       const outDir = resolve(__dirname, config.build.outDir, 'ort');
       mkdirSync(outDir, { recursive: true });
@@ -81,7 +102,27 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    open: true,
+    open: false,
+    proxy: {
+      '/cosmos': {
+        target: 'http://127.0.0.1:5173',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/v1': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    port: 3000,
+    proxy: {
+      '/v1': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: 'esnext',

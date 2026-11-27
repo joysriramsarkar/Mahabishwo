@@ -127,6 +127,10 @@ export class HUD {
           class="hud-btn hidden sm:block px-2 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/10 transition">
           <span aria-hidden="true">↺</span>
         </button>
+        <a id="btn-open-cosmos" href="/cosmos/" title="COSMOS বৈজ্ঞানিক প্ল্যাটফর্ম ও API ল্যাব খুলুন" aria-label="COSMOS সায়েন্টিফিক এক্সপ্লোরার"
+          class="hud-btn hidden sm:flex px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 hover:bg-emerald-500/35 hover:text-white transition items-center gap-1">
+          <span aria-hidden="true">🔬</span><span class="hidden xl:inline">COSMOS</span>
+        </a>
       </div>
     `;
 

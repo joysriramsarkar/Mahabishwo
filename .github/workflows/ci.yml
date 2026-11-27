@@ -76,8 +76,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
       - run: npm ci
-      - name: Root Local-Scope L0 app build
+      - name: Typecheck & L0 Unit tests
+        run: |
+          npx tsc --noEmit
+          npm run test:unit
+      - name: Unified Single-Origin Build (/ Studio + /cosmos/ Explorer)
         run: npm run build

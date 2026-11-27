@@ -174,6 +174,15 @@ function showGraphicsFallback(loader: LoadingScreen, detail?: string): void {
 async function boot(): Promise<void> {
   const loader = new LoadingScreen();
   const stored = loadStoredState();
+  // Conservative default for lower-end / mobile GPUs when user hasn't saved preferences yet.
+  if (!stored) {
+    const cores = typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : 8;
+    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+    const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+    if (cores <= 4 || mem <= 4 || coarse) {
+      state.quality = 'medium';
+    }
+  }
   applyStoredPreferences(state, stored?.preferences);
 
   const initialCanvas = document.getElementById('universe-canvas') as HTMLCanvasElement | null;
@@ -203,8 +212,7 @@ async function boot(): Promise<void> {
   });
 
   loader.setProgress(15, 'HDR রেন্ডার ইঞ্জিন চালু হচ্ছে...');
-  engine.setQuality(state.quality);
-  engine.pipeline.setBloom(state.bloom);
+  engine.setQuality(state.quality, state.bloom);
   const sceneManager = new SceneManager(engine, state);
   const cameraCtrl = new CameraController(engine.camera, state);
   sceneManager.bindCameraController(cameraCtrl);
@@ -391,10 +399,12 @@ async function boot(): Promise<void> {
   // Resize handler
   window.addEventListener('resize', () => engine.resize());
 
-  // Main render loop
+  // Main render loop + automatic low-FPS adaptive guardrail
   let lastTime = performance.now();
   let fpsAccum = 0;
   let fpsFrames = 0;
+  let lowFpsStreak = 0;
+  let autoDowngraded = false;
 
   function animate(now: number): void {
     requestAnimationFrame(animate);
@@ -419,6 +429,23 @@ async function boot(): Promise<void> {
     if (fpsAccum >= 0.5) {
       state.fps = fpsFrames / fpsAccum;
       ui.hud.updateFps(state.fps);
+      if (
+        !autoDowngraded &&
+        document.visibilityState === 'visible' &&
+        state.fps < 24 &&
+        state.quality !== 'low'
+      ) {
+        lowFpsStreak++;
+        if (lowFpsStreak >= 6) {
+          state.quality = state.quality === 'high' ? 'medium' : 'low';
+          engine.setQuality(state.quality, state.bloom);
+          ui.controlsPanel.syncQuality();
+          autoDowngraded = true;
+          Toasts.show('⚡ কম FPS শনাক্ত: মসৃণ চলার জন্য গ্রাফিক্স কোয়ালিটি সামঞ্জস্য করা হয়েছে', 4000);
+        }
+      } else {
+        lowFpsStreak = 0;
+      }
       fpsAccum = 0;
       fpsFrames = 0;
     }

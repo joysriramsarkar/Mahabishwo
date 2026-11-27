@@ -57,6 +57,10 @@ function backendToCosmic(b: BackendObject): CosmicObject | null {
 }
 
 async function fetchBackendObjects(): Promise<CosmicObject[] | null> {
+  const configuredApi = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_COSMOS_API;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && !configuredApi) {
+    return null; // Skip localhost API probe on static HTTPS hosting unless VITE_COSMOS_API is configured
+  }
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 2500);

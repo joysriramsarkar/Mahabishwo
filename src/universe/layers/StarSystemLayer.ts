@@ -20,6 +20,11 @@ import { SUN_VERTEX, SUN_FRAGMENT, PROMINENCE_VERTEX, PROMINENCE_FRAGMENT } from
 import { TextureFactory } from '../../render/TextureFactory';
 import { RealTextures } from '../../render/RealTextures';
 import {
+  solveEccentricAnomaly,
+  keplerianOrbitPosition,
+  TWO_PI,
+} from '../../physics/orbitalMechanics';
+import {
   buildStarData,
   createStarPoints,
   createShaderGlow,
@@ -79,16 +84,6 @@ interface ActiveComet {
   angularSpeed: number;
 }
 
-/** Solve Kepler's equation M = E - e·sin(E) for the eccentric anomaly. */
-function solveEccentricAnomaly(M: number, e: number): number {
-  let E = e < 0.8 ? M : Math.PI;
-  for (let i = 0; i < 4; i++) {
-    E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-  }
-  return E;
-}
-
-const TWO_PI = Math.PI * 2;
 /** Sun's spin rate: rad per simulated day. */
 const SUN_SPIN_RATE = TWO_PI / SUN_ROTATION_DAYS;
 
@@ -447,13 +442,9 @@ export class StarSystemLayer implements SceneLayer {
       // Place the planet at its true eccentric position; the −sin term keeps
       // the orbit prograde (counterclockwise seen from ecliptic north).
       const startE = solveEccentricAnomaly(startM, ecc);
-      const semiMinor = pData.orbitRadius * Math.sqrt(1 - ecc * ecc);
+      const startPos = keplerianOrbitPosition(pData.orbitRadius, ecc, startE);
       const planetGroup = new THREE.Group();
-      planetGroup.position.set(
-        Math.cos(startE) * pData.orbitRadius - pData.orbitRadius * ecc,
-        0,
-        -Math.sin(startE) * semiMinor
-      );
+      planetGroup.position.set(startPos.x, 0, startPos.z);
       this.group.add(planetGroup);
 
       // Axial tilt on a dedicated parent group: the spin axis then stays
@@ -625,13 +616,8 @@ export class StarSystemLayer implements SceneLayer {
       // planet sweep faster near perihelion and slower near aphelion.
       p.angle += dtDays * p.angularSpeed;
       const E = solveEccentricAnomaly(p.angle, p.eccentricity);
-      const a = p.data.orbitRadius;
-      const b = a * Math.sqrt(1 - p.eccentricity * p.eccentricity);
-      p.group.position.set(
-        Math.cos(E) * a - a * p.eccentricity,
-        0,
-        -Math.sin(E) * b
-      );
+      const pos = keplerianOrbitPosition(p.data.orbitRadius, p.eccentricity, E);
+      p.group.position.set(pos.x, 0, pos.z);
       // Axial spin from the real sidereal rotation period (Venus crawls,
       // Jupiter races; Mercury's 58.6 d vs 88 d year = 3:2 resonance).
       p.mesh.rotation.y += dtDays * p.spinSpeed;

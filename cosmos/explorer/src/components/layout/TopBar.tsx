@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Menu, Search } from 'lucide-react';
 import { useExplorer } from '@/state/explorer';
 import { ExplorerControls } from './ExplorerControls';
+import { resolveLocalAppUrl } from '@/lib/l0Url';
 
 export function TopBar({ searchSlot, compact = false, onOpenControls }: {
   searchSlot?: ReactNode; compact?: boolean; onOpenControls?: () => void;
@@ -29,6 +30,14 @@ export function TopBar({ searchSlot, compact = false, onOpenControls }: {
             Local Scope: পূর্ণ MW + L0
           </span>
         )}
+        <a
+          href={resolveLocalAppUrl()}
+          className="inline-flex min-h-8 items-center gap-1 rounded-sm border border-border-subtle bg-base px-2 py-1 text-[11px] font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          title="মহাবিশ্ব ৩ডি সিমুলেশন (L0 স্টুডিও)-তে যান"
+        >
+          <span aria-hidden="true">🌌</span>
+          <span className="hidden sm:inline">৩ডি স্টুডিও</span>
+        </a>
       </div>
 
       {compact ? (

@@ -5,7 +5,12 @@ import path from 'node:path';
 /// <reference types="vitest" />
 
 export default defineConfig({
+  base: process.env.VITE_BASE || '/',
   plugins: [react()],
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
