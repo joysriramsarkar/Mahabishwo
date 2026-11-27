@@ -28,7 +28,7 @@ export function ExplorerControls({ showPanels = true }: { showPanels?: boolean }
         H₀
         <select aria-label="ParameterSet H0" value={h0Set}
           onChange={(e) => setH0Set(e.target.value as typeof h0Set)}
-          className="min-h-11 rounded-sm border border-border-subtle bg-base/60 px-2 text-[11px]">
+          className="min-h-11 rounded-sm border border-border-subtle bg-base px-2 text-[11px] text-ink">
           <option value="Planck18">67.7 Planck18</option>
           <option value="SH0ES">73.0 SH0ES</option>
           <option value="CCHP">69.8 CCHP</option>
