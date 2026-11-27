@@ -72,6 +72,9 @@ python cosmos/validation/pipeline/numerical.py
 ```
 স্থানীয় generated-IC P(k), σ₈/PS/Tinker HMF, PM 2/4/8 time-step ও EMU holdout চালায়। External solver/production spatial gates `UNAVAILABLE` রিপোর্ট করে; executable presence-কে scientific pass ধরা হয় না।
 
+## বাকি কাজ ও সীমা
+COSMOS 0.1 (পর্যায় ০–৪) সম্পূর্ণ। Phase 5–8, পূর্ণ Gaia/Cosmicflows ingest, HEALPix tile traversal ও ৫–১০M/60 fps gate-গুলোর local scaffold আছে, কিন্তু real data/HPC/GPU ছাড়া scientific pass `UNAVAILABLE`। বিস্তারিত: [`docs/remaining-work.md`](docs/remaining-work.md)।
+
 ## R-20 pre-registration (রানের আগে)
 ```powershell
 $env:COSMOS_PREREG_SECRET="..."

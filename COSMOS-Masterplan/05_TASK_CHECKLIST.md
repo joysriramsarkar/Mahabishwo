@@ -3,6 +3,7 @@
 > তৈরি: ২৭ নভে. ২০২৬ · হালনাগাদ: ২৭ নভে. ২০২৬ (বাস্তবায়ন-সেশন শেষে)
 > অবস্থা-চিহ্ন: `[ ]` বাকি · `[x]` সম্পন্ন ও যাচাইকৃত · `[~]` আংশিক · `[!]` বাহ্যিক সম্পদে অবরুদ্ধ (HPC/ভবিষ্যৎ ডেটা-রিলিজ) — বানানো ফল দিয়ে পাস দেখানো নিষিদ্ধ (N14/N16)।
 > ক্যাননিক্যাল নথি: `cosmos_unified_masterplan.md` · সিদ্ধান্ত: `02_DECISION_REGISTER.md` (Q1–Q5 অনুমোদিত)
+> COSMOS 0.1 (পর্যায় ০–৪) সম্পূর্ণ; বাকি roadmap gate-এর সীমা ও fail-closed প্রমাণ: [`cosmos/docs/remaining-work.md`](../cosmos/docs/remaining-work.md)
 
 ## A. ডকুমেন্টেশন ও সিদ্ধান্ত
 - [x] `00_README.md` পুনর্লেখা — ক্যাননিক্যাল = unified v2.0
@@ -29,7 +30,7 @@
 - [x] Dual-Scope সুইচ (Extragalactic ব্যাজ / Local Scope + রুট L0 অ্যাপের lazy iframe handoff; `VITE_LOCAL_APP_URL`)
 - [x] Caveat সিস্টেম: ⚠ কাউন্টার (StatusBar), "Why is this here?" (InfoPanel), ৫টি ট্রিগার — ইউনিট টেস্টসহ
 - [x] ফ্রেম-টগল Observed ⇄ Comoving-now: source comoving data অক্ষত; known v_los-এ first-order RSD, unknown-এ identity; ~৯০০ ms CPU interpolation (galaxy/cluster/filament/void), reduced-motion-এ instant
-- [~] পারফরম্যান্স: WebGL2/R3F, deterministic camera-distance LOD (far 25k / near max 250k, stable-hash bounded top-k heap `O(n log k)` / `O(k)` memory, unit-tested), Model Lab-এর lazy Arrow IPC tile loader (live API-তে ১,৯৮৬ SIM row parse পাস) ও cone-query < ২ s API-টেস্ট আছে; পূর্ণ HEALPix tile traversal ও ৫–১০M পয়েন্টে ৬০ fps বাস্তব ডেটাসেটে যাচাই বাকি (পর্যায় ৬)
+- [!] পারফরম্যান্স: WebGL2/R3F, deterministic camera-distance LOD (far 25k / near max 250k, stable-hash bounded top-k heap `O(n log k)` / `O(k)` memory, unit-tested), Model Lab-এর lazy Arrow IPC tile loader (live API-তে ১,৯৮৬ SIM row parse পাস) ও cone-query < ২ s API-টেস্ট পাস; পূর্ণ HEALPix tile traversal ও ৫–১০M পয়েন্টে ৬০ fps বাস্তব ডেটাসেট + GPU profile ছাড়া `UNAVAILABLE` (পর্যায় ৬)
 - [x] Playwright ১৪/১৪ desktop+mobile (bottom-sheet, ৯ modes, selection preservation, keyboard search, reduced-motion, L0 iframe, Arrow tile, uncaught-error guard, axe ২ scan) + CI chromium
 - [x] WCAG/mobile: Radix focus-trap bottom-sheet, ≥৪৪px touch targets, safe-area, listbox/combobox semantics, reduced-motion hook; axe-core WCAG 2.1 AA desktop+mobile scan-এ serious/critical ০ (muted contrast 4.18→≥4.5, slider thumb label সংশোধিত)
 
@@ -41,9 +42,9 @@
 - [x] Pre-registration: HMAC-signed criteria, ট্যাম্পার-প্রমাণ (R-20); `cosmos/tools/preregister_run.py` signed JSON + annotated git tag CLI (disposable-repo test পাস)
 
 ## E. ডেটা-Ingest (M1–M7)
-- [~] M1–M2 সিড: MW + উপাদান + Sgr A* + সৌরজগৎ; R₀=8.277 kpc acceptance-টেস্টে। Gaia DR3 regional TAP adapter প্রস্তুত (৩৩ ingestion tests-এর অংশ); পূর্ণ ক্যাটালগ ডাউনলোড ইচ্ছাকৃতভাবে বাদ (ডেটা-পর্যায়)
+- [!] M1–M2 সিড: MW + উপাদান + Sgr A* + সৌরজগৎ; R₀=8.277 kpc acceptance-টেস্টে। Gaia DR3 regional TAP adapter প্রস্তুত (৩৩ ingestion tests-এর অংশ); live TAP endpoint এখন HTML ফেরত দেয় → `--execute` fail-closed (exit 2, output লেখা হয় না); DR4 ২ ডিসে. ২০২৬-এর আগে পূর্ণ ক্যাটালগ `UNAVAILABLE`
 - [x] M3–M5 সিড-ক্যাটালগ: Local Group সদস্য, Local Sheet + Council of Giants (১২) + Local Void, Virgo (16.5±0.1 Mpc) + Fornax — সব ভরে definition ট্যাগ
-- [~] M6–M7 সিড: Laniakea (flow-defined watershed, LG→CMB 620±15 km/s গেট), Shapley/Perseus–Pisces/Coma/Hercules। Cosmicflows-4 bounded local-table adapter প্রস্তুত; পূর্ণ Wiener পুনর্গঠন বাস্তব ডেটাসেটে বাকি
+- [!] M6–M7 সিড: Laniakea (flow-defined watershed, LG→CMB 620±15 km/s গেট), Shapley/Perseus–Pisces/Coma/Hercules। Cosmicflows-4 bounded local-table adapter প্রস্তুত; পূর্ণ Wiener/BORG constrained realization real full catalogue ছাড়া `UNAVAILABLE`
 - [x] ৮ উৎসের adapter: Gaia DR3 TAP/ADQL, Cosmicflows-4, McConnachie, DESI, Euclid, Planck, JWST PUBLIC metadata, LIGO/Virgo/KAGRA GWOSC — dry-run default, byte/row/rights caps, atomic validated output; pytest ৩৩/৩৩
 - [x] রিলিজ-ট্র্যাকার: repository + adapter-scoped registries; Gaia DR4 (২ ডিসে. ২০২৬) ও DESI DR2 bulk upstream unavailable হলে fail closed
 - [x] Ingest-গেট CI-তে: উৎস+অনিশ্চয়তা-নোট+লাইসেন্স+ভর-ট্যাগ ছাড়া ডেটা প্রবেশ নিষিদ্ধ — সিড ক্যাটালগে ০ এরর, ১২টি সৎ সতর্কতা
@@ -52,15 +53,15 @@
 - [x] রেফারেন্স Python যাচাই: G0 astropy-পথ ≤1e-6 গেট পাস; স্বতন্ত্র numeric ~3e-3 (নিউট্রিনো-আসন্নীকরণ, নথিভুক্ত); PM ভর-সংরক্ষণ/গতি, 1LPT/2LPT টেস্ট
 - [x] সলভার-মনোনয়ন সারণি: `cosmos/engine/SOLVERS.md` + ADR-0003 (প্রতি কাজে একটি প্রাথমিক)
 - [x] On-the-fly light-cone writer (PM-step হুক, snapshot-interpolation নিষিদ্ধ C-23) + repetition-detector
-- [~] পর্যায় ৫ গেট (টয়-স্কেলে): independent σ₈/PS/Tinker HMF, PM 2/4/8 time-step convergence ও generated-IC ensemble P(k) recovery পাস; low-mode shell-এ fixed tolerance নয়, auditable per-shell 3σ ensemble error budget ব্যবহৃত। প্রকৃত spatial P(k)/HMF ≤১–২%, COLA-তুলনা ও ×2/4/8 spatial ladder উৎপাদন রানে (ক্লাস্টার)
+- [!] পর্যায় ৫ গেট: টয়-স্কেলে independent σ₈/PS/Tinker HMF, PM 2/4/8 time-step convergence ও generated-IC ensemble P(k) recovery পাস; low-mode shell-এ auditable per-shell 3σ error budget। প্রকৃত spatial P(k)/HMF ≤১–২%, COLA-তুলনা ও ×2/4/8 spatial ladder HPC production run ছাড়া `UNAVAILABLE` (pre-registration/provenance বাধ্যতামূলক)
 - [x] পর্যায় ৬ কাঠামো: S0–S7 শেল (continuity টেস্ট), HOD/SAM রেফারেন্স, CMB HEALPix মডিউল (healpy ঐচ্ছিক), mock-observation জব
 - [!] পর্যায় ৭–৮: AREPO/GIZMO hydro zoom, BORG Twin Mode, Z7 hero run, Z8 GRMHD/MESA — HPC বরাদ্দ-নির্ভর (Q4)। প্রস্তাব-রূপরেখা, Docker/Apptainer recipe ও `cosmos/tools/hpc_readiness.py` প্রস্তুত; এই মেশিনে executable না থাকায় readiness `false`/exit 2 (বানানো pass নয়)
 - [x] C++20/CUDA সলভার সচেতনভাবে পিছিয়ে; external solver adapters (CLASS/CAMB/MUSIC/COLA/FASTPM/GADGET/AREPO/GIZMO/ROCKSTAR/BORG) executable detection + fail-closed invocation; ML emulator holdout gate (held-out >১–২% হলে FAIL, EMU provenance tag বাধ্যতামূলক)
 
 ## G. ভ্যালিডেশন (ট্র্যাক V)
-- [~] ছয়-ধাপের সিঁড়ি: ধাপ ১–২ বাস্তবায়িত (unit/manufactured + analytic/astropy/independent numerical references); ধাপ ৩–৬ উৎপাদন solver/data/ভবিষ্যৎ observation-নির্ভর — R-20 pre-registration CLI ও R-21 provenance প্রস্তুত
+- [!] ছয়-ধাপের সিঁড়ি: ধাপ ১–২ সম্পন্ন (unit/manufactured + analytic/astropy/independent numerical references); ধাপ ৩–৬ production solver/data/ভবিষ্যৎ observation-নির্ভর → `UNAVAILABLE`; R-20 pre-registration CLI ও R-21 provenance প্রস্তুত, কিন্তু registered production run ছাড়া gate pass নয়
 - [x] ১০টি পাইপলাইন-চেক অটোমেশন — `cosmos/validation/pipeline/checks.py` ১০/১০ PASS
-- [~] Numerical validation: independent σ₈/PS/Tinker HMF, executed PM 2/4/8 time-step ladder, generated-IC ensemble P(k) recovery ও EMU holdout gate-সহ local numerical suite ২৮/২৮ PASS; solver detection কেবল report করে — production phase-5/7 spatial/solver gates স্পষ্টভাবে UNAVAILABLE
+- [!] Numerical validation: local executable suite ২৮/২৮ PASS (independent σ₈/PS/Tinker HMF, PM 2/4/8 ladder, ensemble P(k), EMU holdout); solver detection কেবল report — production phase-5/7 spatial/solver gates `UNAVAILABLE` (see `cosmos/docs/remaining-work.md`)
 - [x] COSMOS 0.1-এর ১০টি গ্রহণযোগ্যতা-পরীক্ষা — `cosmos/validation/acceptance/test_acceptance.py` ১০/১০ PASS
 
 ## H. নিষেধাজ্ঞা (সর্বদা প্রযোজ্য)

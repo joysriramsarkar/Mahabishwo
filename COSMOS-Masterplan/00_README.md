@@ -26,3 +26,4 @@
 | ডেটা/স্কিমা/ভ্যালিডেশন | `cosmos/datasets/`, `cosmos/scientific-knowledge/`, `cosmos/validation/` | — | ✅ ৮ উৎসের bounded adapter (pytest ৩৩/৩৩), ingest-গেট ০ এরর; pipeline ১০/১০; acceptance ১০/১০; numerical references বাস্তবায়িত (production solver gates UNAVAILABLE) |
 | L0 সৌরজগৎ মডিউল | রিপো-রুট `src/` (নিজস্ব অ্যাপ) | — | ✅ build সফল; Explorer Local Scope থেকে lazy iframe handoff |
 | Deployment/HPC readiness | `cosmos/deploy/`, `cosmos/tools/hpc_readiness.py` | — | ⚠️ Docker/Apptainer recipes ও fail-closed checker; এই মেশিনে HPC executables নেই (ready=false, exit 2) |
+| বাকি roadmap-এর সীমা | [`cosmos/docs/remaining-work.md`](../cosmos/docs/remaining-work.md) | — | ⚠️ COSMOS 0.1 সম্পূর্ণ; phase 5–8, full Gaia/Cosmicflows, HEALPix/60 fps gate-গুলো real data/HPC ছাড়া `UNAVAILABLE` — কোনো বানানো pass নেই |
