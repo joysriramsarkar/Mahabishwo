@@ -112,6 +112,9 @@ function generateGalaxies(count: number): CosmicObject[] {
       ra: ((Math.atan2(pos.y, pos.x) * 180) / Math.PI + 360) % 360,
       dec: (Math.asin(pos.z / Math.max(distMpc, 1e-9)) * 180) / Math.PI,
       redshift: { value: (distMpc * 67.66) / 299792.458, unit: 'z', method: 'simulated Hubble-law from demo position' },
+      // Deterministic SIM peculiar velocity, solely to exercise the observed
+      // light-cone RSD transform. It is not an observed measurement.
+      vLosKms: 350 * Math.sin((i + 1) * 12.9898),
       distanceMpc: { value: distMpc, unit: 'Mpc', method: 'simulated position modulus' },
       massMsun: { value: 10 ** (9.5 + rand() * 2), unit: 'Msun', method: 'simulated' },
       sources: [{ dataset: 'COSMOS demo simulation', release: 'SIM seed 42', accessedAt: new Date().toISOString() }],

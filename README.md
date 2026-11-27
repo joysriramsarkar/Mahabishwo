@@ -6,6 +6,9 @@
 
 **An interactive, physics-accurate 3D universe simulation with seamless continuous zoom — from the observable universe down to a planet's surface.**
 
+## COSMOS প্ল্যাটফর্ম
+এই রিপোতে COSMOS-এর একীভূত মনোরিপো [`cosmos/`](cosmos/README.md)-ও রয়েছে। ক্যাননিক্যাল মাস্টারপ্ল্যান: [`COSMOS-Masterplan/cosmos_unified_masterplan.md`](COSMOS-Masterplan/cosmos_unified_masterplan.md)؛ বাস্তবায়ন-চেকলিস্ট: [`COSMOS-Masterplan/05_TASK_CHECKLIST.md`](COSMOS-Masterplan/05_TASK_CHECKLIST.md)। উপরের My Universe অ্যাপটি COSMOS Explorer-এর **Local Scope L0 (সৌরজগৎ)** মডিউল হিসেবে ব্যবহৃত হয়।
+
 | গড'স আই ভিউ — সম্পূর্ণ আলোকিত পৃথিবী | শনির বলয় ও উপগ্রহ |
 |:---:|:---:|
 | ![God's Eye Earth](docs/screenshots/earth-gods-eye.jpeg) | ![Saturn](docs/screenshots/saturn-rings.jpeg) |

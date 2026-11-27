@@ -49,7 +49,7 @@ export function TimeLabView() {
         নিচের Timebar দিয়ে স্ক্রাব করুন — Viewport3D-তে epochZ অনুযায়ী বস্তু ছাঁটা হয় (getSnapshot)।
         Transient-এর জন্য আলাদা Observer-time (API /transients)।
       </p>
-      <TimeController />
+      <TimeController presentation="sheet" />
     </div>
   );
 }
@@ -133,6 +133,23 @@ export function ModelLabView() {
   const h0Set = useExplorer((s) => s.h0Set);
   const setH0Set = useExplorer((s) => s.setH0Set);
   const [customH0, setCustomH0] = useState(67.66);
+  const [tileLevel, setTileLevel] = useState(2);
+  const [tileId, setTileId] = useState(7);
+  const tileStatus = useExplorer((s) => s.tileStatus);
+  const tileError = useExplorer((s) => s.tileError);
+  const tileObjects = useExplorer((s) => s.tileObjects);
+  const setTileObjects = useExplorer((s) => s.setTileObjects);
+  const setTileStatus = useExplorer((s) => s.setTileStatus);
+  const loadTile = async () => {
+    setTileStatus('loading');
+    try {
+      const { fetchLightconeTile } = await import('@/data/lightconeTiles');
+      const objects = await fetchLightconeTile({ level: tileLevel, tileId });
+      setTileObjects(objects);
+    } catch (error) {
+      setTileStatus('error', error instanceof Error ? error.message : String(error));
+    }
+  };
   const targets = [
     { name: 'Virgo Cluster', refMpc: 16.5 },
     { name: 'Coma', refMpc: 99.5 },
@@ -180,12 +197,36 @@ export function ModelLabView() {
         দূরত্বের H₀-রেঞ্জ (Virgo উদাহরণ): {distanceRangeForH0(16.5).low.toFixed(1)}–{distanceRangeForH0(16.5).high.toFixed(1)} Mpc (±৭% caveat-এর ভিত্তি)।
         বিকল্প cosmology (WDM, w₀wₐ, modified gravity) পর্যায় ১০-এর কাজ — এখানে শুধু H₀/w নব।
       </p>
+      <section className="mt-5 rounded-md border border-border-subtle bg-panel p-3">
+        <h4 className="font-medium">Arrow IPC Light-cone Tile (বাস্তব API path)</h4>
+        <p className="mt-1 text-[12px] text-ink-subtle">
+          FastAPI <span className="font-mono">/v1/lightcone/tiles/&lt;level&gt;/&lt;tile_id&gt;</span> থেকে Arrow stream লোড করুন।
+          টাইল ডেটা SIM — OBS নয়। API চালু না থাকলে error দেখাবে, mock data দিয়ে pass দেখাবে না।
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1">level
+            <input type="number" min={0} max={12} value={tileLevel} onChange={(e) => setTileLevel(Number(e.target.value))}
+              className="w-20 rounded border border-border-subtle bg-base px-2 py-2" />
+          </label>
+          <label className="flex items-center gap-1">tile
+            <input type="number" min={0} value={tileId} onChange={(e) => setTileId(Number(e.target.value))}
+              className="w-24 rounded border border-border-subtle bg-base px-2 py-2" />
+          </label>
+          <button type="button" onClick={loadTile} disabled={tileStatus === 'loading'}
+            className="min-h-11 rounded border border-accent/50 px-3 text-accent disabled:opacity-40">
+            {tileStatus === 'loading' ? 'লোড হচ্ছে…' : 'Arrow tile লোড'}
+          </button>
+          <span className="text-[12px] text-ink-muted">লোডকৃত SIM বস্তু: {tileObjects.length}{tileStatus === 'loaded' ? ' · Arrow IPC' : ''}</span>
+        </div>
+        {tileError && <p role="alert" className="mt-2 text-[12px] text-[#FF7373]">{tileError}</p>}
+      </section>
     </div>
   );
 }
 
 /** Local Scope (Dual-Scope s15.1 rule 7): full MW + L0 handoff. */
 export function LocalScopeView() {
+  const [showL0, setShowL0] = useState(false);
   const { data } = useAllObjects();
   const local = useMemo(() => {
     return (data ?? []).filter((o) => {
@@ -202,12 +243,31 @@ export function LocalScopeView() {
         সৌরজগৎ (L0) মডিউল সক্রিয়। 1 Mpc-এর ভেতরে জুমে L0-তে মসৃণ handoff:
       </p>
       <div className="mt-3 rounded-md border border-accent/40 bg-accent/10 p-3">
-        <div className="font-medium">L0 সৌরজগৎ মডিউল (রুট অ্যাপ)</div>
-        <p className="text-ink-subtle">
-          Keplerian সৌরজগৎ (৮ গ্রহ, ১৫ চাঁদ, বলয়, বাসযোগ্য অঞ্চল) রুট অ্যাপে চলছে —
-          <a className="text-accent underline" href="http://localhost:3000" target="_blank" rel="noreferrer"> http://localhost:3000-এ খুলুন </a>
-          (রিপো-রুটে <span className="font-mono">npm run dev</span>)। মডিউল: <span className="font-mono">src/universe/layers/StarSystemLayer.ts + PlanetLayer.ts</span>।
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-medium">L0 সৌরজগৎ মডিউল (রুট অ্যাপ)</div>
+          <button type="button" onClick={() => setShowL0((v) => !v)}
+            className="min-h-11 rounded-sm border border-accent/50 px-3 text-[12px] text-accent">
+            {showL0 ? 'L0 বন্ধ করুন' : 'L0 এখানেই খুলুন'}
+          </button>
+        </div>
+        <p className="mt-1 text-ink-subtle">
+          Keplerian সৌরজগৎ (৮ গ্রহ, ১৫ চাঁদ, বলয়, বাসযোগ্য অঞ্চল)। URL পরিবর্তন: <span className="font-mono">VITE_LOCAL_APP_URL</span>।
+          মডিউল: <span className="font-mono">src/universe/layers/StarSystemLayer.ts + PlanetLayer.ts</span>।
         </p>
+        {showL0 && (
+          <div className="mt-3 overflow-hidden rounded-md border border-border-subtle">
+            <iframe
+              title="COSMOS L0 Solar System"
+              src={(import.meta as unknown as { env?: Record<string, string> }).env?.VITE_LOCAL_APP_URL ?? 'http://localhost:3000'}
+              className="h-[60dvh] w-full bg-base"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+            <p className="px-3 py-2 text-[11px] text-ink-muted">
+              L0 আলাদা origin-এ চলছে। না খুললে রিপো-রুটে <span className="font-mono">npm run dev</span> চালান।
+            </p>
+          </div>
+        )}
       </div>
       <h4 className="mt-4 font-medium">স্থানীয় বস্তু ({local.length})</h4>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

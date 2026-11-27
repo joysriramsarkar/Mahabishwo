@@ -1,10 +1,12 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, AdaptiveDpr, Preload } from '@react-three/drei';
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { useExplorer } from '@/state/explorer';
 import { useAllObjects } from '@/data/queries';
-import { LAYERS } from '@/data/layers';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { objectForFrame } from '@/lib/frameTransform';
+import { lodBudget, selectLOD } from '@/lib/lod';
 import { GalaxyLayer } from './layers/GalaxyLayer';
 import { ClusterLayer } from './layers/ClusterLayer';
 import { FilamentLayer } from './layers/FilamentLayer';
@@ -19,28 +21,27 @@ export function Viewport3D() {
   const select = useExplorer((s) => s.select);
   const hover = useExplorer((s) => s.hover);
   const setCamera = useExplorer((s) => s.setCamera);
+  const cameraDistance = useExplorer((s) => {
+    const [x, y, z] = s.camera.position;
+    const [tx, ty, tz] = s.camera.target;
+    return Math.hypot(x - tx, y - ty, z - tz);
+  });
   const { data, isPending } = useAllObjects();
-  const [rayTargets, setRayTargets] = useState<CosmicObject[]>([]);
+  const tileObjects = useExplorer((s) => s.tileObjects);
+  const reducedMotion = useReducedMotion();
 
   const frame = useExplorer((s) => s.frame);
   const epochZ = useExplorer((s) => s.epochZ);
 
-  // Frame transform (s15.1 rule 1): Observed/light-cone shows positions as
-  // observed; Comoving-now shows the same-epoch comoving reconstruction;
-  // proper scales comoving by 1/(1+z). The switch re-renders positions -
-  // the visual jump IS the redshift-space / epoch difference lesson.
+  // Source positionMpc remains comoving. objectForFrame returns render-only
+  // coordinates; the layers interpolate between them over ~900 ms.
   const objects = useMemo(() => {
-    const all = data ?? [];
-    return all.map((o) => {
-      const z = o.redshift?.value ?? 0;
-      if (frame === 'proper') {
-        const s = 1 / (1 + z);
-        return { ...o, positionMpc: { x: o.positionMpc.x * s, y: o.positionMpc.y * s, z: o.positionMpc.z * s } };
-      }
-      return o;
+    const all = [...(data ?? []), ...tileObjects];
     // epochZ=0 means "today" (full light-cone); otherwise z-cut (Time Lab).
-    }).filter((o) => epochZ === 0 || (o.redshift?.value ?? 0) <= epochZ);
-  }, [data, frame, epochZ]);
+    return all
+      .filter((o) => epochZ === 0 || (o.redshift?.value ?? 0) <= epochZ)
+      .map((o) => objectForFrame(o, frame));
+  }, [data, tileObjects, frame, epochZ]);
 
   const visible = useMemo(() => {
     return objects.filter((o) => {
@@ -48,16 +49,23 @@ export function Viewport3D() {
       if (filters.evidence.length && !filters.evidence.includes(o.evidence)) return false;
       if (filters.maxRedshift !== undefined) {
         const z = o.redshift?.value;
+        // Unknown redshift cannot be proven inside the requested shell.
         if (z === undefined || z > filters.maxRedshift) return false;
       }
       return true;
     });
   }, [objects, filters]);
 
-  const pickable = useMemo(
-    () => visible.filter((o) => o.type === 'galaxy'),
-    [visible]
-  );
+  const galaxyCandidates = useMemo(
+    () => visible.filter((o) => o.type === 'galaxy'), [visible]);
+  const rankedGalaxies = useMemo(
+    () => galaxyCandidates.length > 250_000
+      ? selectLOD(galaxyCandidates, 250_000) : galaxyCandidates,
+    [galaxyCandidates]);
+  const pickable = useMemo(() => {
+    const budget = lodBudget(galaxyCandidates.length, cameraDistance);
+    return budget >= galaxyCandidates.length ? galaxyCandidates : rankedGalaxies.slice(0, budget);
+  }, [galaxyCandidates, rankedGalaxies, cameraDistance]);
 
   const handlePick = useCallback(
     (obj: CosmicObject | null) => {
@@ -71,8 +79,6 @@ export function Viewport3D() {
     [hover]
   );
 
-  const clockRef = useRef(0);
-
   return (
     <div className="absolute inset-0">
       <Canvas
@@ -81,15 +87,15 @@ export function Viewport3D() {
         camera={{ position: [600, 320, 900], fov: 45, near: 0.1, far: 50_000 }}
         onPointerMissed={() => handlePick(null)}
         onCreated={({ raycaster }) => {
-          raycaster.params.Points.threshold = 2;
+          raycaster.params.Points.threshold = window.matchMedia('(pointer: coarse)').matches ? 5 : 2;
         }}
-        onPointerMove={(e) => { clockRef.current = performance.now(); }}
       >
         <color attach="background" args={['#05070D']} />
         <fog attach="fog" args={['#05070D', 2500, 5000]} />
         <SceneSetup
           onCameraChanged={(c) => setCamera(c)}
           onStartClock={() => {}}
+          reducedMotion={reducedMotion}
         />
         <AdaptiveDpr pixelated />
         <Suspense fallback={null}>
@@ -101,7 +107,8 @@ export function Viewport3D() {
           )}
 
           {layers['cosmic-web'].visible && (
-            <FilamentLayer objects={visible} opacity={layers['cosmic-web'].opacity} />
+            <FilamentLayer objects={visible} opacity={layers['cosmic-web'].opacity}
+              transitionKey={frame} reducedMotion={reducedMotion} />
           )}
 
           {layers.superclusters.visible && (
@@ -109,6 +116,8 @@ export function Viewport3D() {
               objects={visible}
               opacity={layers.superclusters.opacity}
               type="supercluster"
+              transitionKey={frame}
+              reducedMotion={reducedMotion}
             />
           )}
           {layers['clusters-groups'].visible && (
@@ -116,11 +125,14 @@ export function Viewport3D() {
               objects={visible}
               opacity={layers['clusters-groups'].opacity}
               type="cluster"
+              transitionKey={frame}
+              reducedMotion={reducedMotion}
             />
           )}
 
           {layers.voids.visible && (
-            <VoidLayer objects={visible} opacity={layers.voids.opacity} />
+            <VoidLayer objects={visible} opacity={layers.voids.opacity}
+              transitionKey={frame} reducedMotion={reducedMotion} />
           )}
 
           {layers.galaxies.visible && (
@@ -129,6 +141,8 @@ export function Viewport3D() {
               opacity={layers.galaxies.opacity}
               onPick={handlePick}
               onHover={handleHover}
+              transitionKey={frame}
+              reducedMotion={reducedMotion}
             />
           )}
 
@@ -155,7 +169,7 @@ function LegendOverlay() {
     <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border-subtle bg-panel/70 px-3 py-2 text-[11px] text-ink-subtle backdrop-blur">
       <div className="mb-1 font-medium text-ink">বর্তমান দৃশ্য</div>
       <div>{frame === 'lightcone'
-        ? 'Observed (light-cone): আকাশে যেভাবে দেখা যায় — ভিন্ন বস্তু ভিন্ন যুগের'
+        ? 'Observed (light-cone): known vₗₒₛ-এ RSD; velocity নেই — অজানা, তাই অবস্থান অপরিবর্তিত'
         : 'Comoving-now পুনর্গঠন — টেলিস্কোপের প্রত্যক্ষ দৃশ্য নয়'}</div>
       <div className="mt-1 text-ink-muted">মোড: {mode === '3d' ? '3D' : mode} · ফ্রেম: {frame}</div>
     </div>

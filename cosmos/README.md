@@ -29,16 +29,52 @@
 ## দ্রুত শুরু
 
 ```powershell
-# Python ইঞ্জিন + API টেস্ট
-cd cosmos
-pip install -e ".[dev]"
-pytest
+# Python ইঞ্জিন + API টেস্ট (রিপো রুট থেকে)
+pip install -e "cosmos/engine/reference-python[api,dev]"
+python -m pytest cosmos/tests -q
 
 # API সার্ভার
-uvicorn services.api.main:app --reload   # অথবা: python -m cosmos_api
+uvicorn services.api.main:app --reload --app-dir cosmos
 
 # Explorer
-cd explorer
+cd cosmos/explorer
 npm install
 npm run dev
+
+# L0 handoff (আলাদা terminal, রিপো রুট)
+npm run dev
 ```
+
+## Bounded data ingest
+```powershell
+python cosmos/scientific-knowledge/ingest/cli.py sources
+python cosmos/scientific-knowledge/ingest/cli.py plan gaia --ra 10.6847 --dec 41.2692 --radius-deg 0.1 --limit 10
+```
+Dry-run ডিফল্ট; `--execute` ছাড়া network/file read হয় না। বিস্তারিত `cosmos/scientific-knowledge/ingest/README.md`।
+
+## Deployment / HPC readiness
+```powershell
+docker compose -f cosmos/deploy/docker-compose.yml up --build
+python cosmos/tools/hpc_readiness.py phase5 hpc
+```
+Readiness exit 2 = solver/HPC executable অনুপস্থিত; এটি validation pass নয়।
+
+## API benchmark
+API চালু অবস্থায়:
+```powershell
+python cosmos/tools/benchmark_api.py
+```
+২৭ নভে. ২০২৬-এর seed-scale ফল: cone ~১৯ ms (<২ s), mock observation ~৬ ms (<১০ s), statistics ~৪ ms (<৫ s), Arrow tile ~৬৮ ms / ৫৬,৩৬৮ B (chiসহ, SIM; startup warm-up + cache)। এটি production-load benchmark নয়।
+
+## Numerical validation
+```powershell
+python cosmos/validation/pipeline/numerical.py
+```
+স্থানীয় generated-IC P(k), σ₈/PS/Tinker HMF, PM 2/4/8 time-step ও EMU holdout চালায়। External solver/production spatial gates `UNAVAILABLE` রিপোর্ট করে; executable presence-কে scientific pass ধরা হয় না।
+
+## R-20 pre-registration (রানের আগে)
+```powershell
+$env:COSMOS_PREREG_SECRET="..."
+python cosmos/tools/preregister_run.py run-001 criteria.json --output out/prereg-run-001.json
+```
+CLI finite numeric criteria, clean git tree (অথবা explicit `--allow-dirty`), HMAC signature ও annotated `prereg-<run_id>` tag নিশ্চিত করে। Secret JSON-এ থাকে না।

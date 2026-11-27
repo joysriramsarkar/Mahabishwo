@@ -1,7 +1,7 @@
 """G1 initial conditions: EH98 P(k), Gaussian field, 1LPT/2LPT.
 
 From 02_gaussian_ic_2lpt.py; educational - production uses CLASS/CAMB + MUSIC.
-Fixes: np.trapz -> np.trapezoid (NumPy 2), place_particles order=1 crash.
+Fixes: NumPy 1/2 integration fallback, place_particles order=1 crash.
 """
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ def linear_pk(k, cosmo, ns=0.9665, sigma8=0.8102):
     kk = np.logspace(-4, 2, 4000)
     W = 3 * (np.sin(kk * R) - kk * R * np.cos(kk * R)) / (kk * R) ** 3
     Pk = kk**ns * transfer_eh98(kk / cosmo.h, cosmo) ** 2
-    s8sq = np.trapezoid(Pk * W**2 * kk**2, kk) / (2 * np.pi**2)
+    integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    s8sq = integrate(Pk * W**2 * kk**2, kk) / (2 * np.pi**2)
     return P * sigma8**2 / s8sq
 
 
@@ -46,7 +47,10 @@ def gaussian_field(N, L, cosmo, seed=0, z_init=49.0):
     k[0, 0, 0] = 1e-10
     Pk = linear_pk(k, cosmo) * cosmo.growth(z_init) ** 2
     wn = rng.standard_normal((N, N, N))
-    dk = np.fft.rfftn(wn) * np.sqrt(Pk) * (N**3 / L**1.5)
+    # rfftn(unit white noise) already has coefficient variance N^3.  The
+    # remaining volume factor converts the continuum P(k) convention to the
+    # unnormalised NumPy FFT convention used by power.mode_power.
+    dk = np.fft.rfftn(wn) * np.sqrt(Pk) * (N / L)**1.5
     dk[0, 0, 0] = 0
     return dk, (KX, KY, KZ, k)
 

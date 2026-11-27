@@ -1,16 +1,18 @@
 import type { CosmicObject } from '@/types/cosmos';
 import { Html } from '@react-three/drei';
-import * as THREE from 'three';
 import { useExplorer } from '@/state/explorer';
 import { EvidenceBadge } from '@/components/ui/Badge';
+import { AnimatedGroup } from '../useAnimatedTransform';
 
 interface Props {
   objects: CosmicObject[];
   opacity: number;
   type: 'cluster' | 'supercluster';
+  transitionKey?: string;
+  reducedMotion?: boolean;
 }
 
-export function ClusterLayer({ objects, opacity, type }: Props) {
+export function ClusterLayer({ objects, opacity, type, transitionKey = 'initial', reducedMotion = false }: Props) {
   const setCamera = useExplorer((s) => s.setCamera);
   const select = useExplorer((s) => s.select);
   const selectedId = useExplorer((s) => s.selectedId);
@@ -19,24 +21,30 @@ export function ClusterLayer({ objects, opacity, type }: Props) {
   return (
     <group>
       {filtered.map((o) => {
-        const r = Math.max(1, o.radiusMpc ?? 2);
+        const r = Math.max(0.1, o.radiusMpc ?? 2);
         const color = type === 'supercluster' ? '#A78BFA' : '#56D4E8';
+        const p = o.positionMpc;
         return (
-          <group
+          <AnimatedGroup
             key={o.id}
-            position={[o.positionMpc.x, o.positionMpc.y, o.positionMpc.z]}
+            position={[p.x, p.y, p.z]}
+            scale={r}
+            transitionKey={transitionKey}
+            reducedMotion={reducedMotion}
             onClick={(e) => { e.stopPropagation(); select(o.id); }}
+            onPointerOver={(e) => { e.stopPropagation(); useExplorer.getState().hover(o.id); }}
+            onPointerOut={() => useExplorer.getState().hover(null)}
             onDoubleClick={(e) => {
               e.stopPropagation();
-              setCamera({ position: [o.positionMpc.x + 20, o.positionMpc.y + 15, o.positionMpc.z + 20], target: [o.positionMpc.x, o.positionMpc.y, o.positionMpc.z] });
+              setCamera({ position: [p.x + 20, p.y + 15, p.z + 20], target: [p.x, p.y, p.z] });
             }}
           >
             <mesh>
-              <sphereGeometry args={[r, 24, 24]} />
+              <sphereGeometry args={[1, 24, 24]} />
               <meshBasicMaterial color={color} transparent opacity={0.12 * opacity} wireframe />
             </mesh>
             <mesh>
-              <sphereGeometry args={[r * 0.35, 16, 16]} />
+              <sphereGeometry args={[0.35, 16, 16]} />
               <meshBasicMaterial color={color} transparent opacity={0.55 * opacity} />
             </mesh>
             {selectedId === o.id && (
@@ -47,7 +55,7 @@ export function ClusterLayer({ objects, opacity, type }: Props) {
                 </div>
               </Html>
             )}
-          </group>
+          </AnimatedGroup>
         );
       })}
     </group>

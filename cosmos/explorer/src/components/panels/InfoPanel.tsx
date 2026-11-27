@@ -6,8 +6,9 @@ import { formatMpc, formatMassMsun } from '@/lib/format';
 import { Pin, Focus, GitCompare, ExternalLink, HelpCircle } from 'lucide-react';
 import { computeCaveats, whyIsThisHere } from '@/lib/caveats';
 import { distanceRangeForH0 } from '@/lib/cosmology';
+import { positionForFrame } from '@/lib/frameTransform';
 
-export function InfoPanel() {
+export function InfoPanel({ embedded = false }: { embedded?: boolean }) {
   const selectedId = useExplorer((s) => s.selectedId);
   const setCamera = useExplorer((s) => s.setCamera);
   const pin = useExplorer((s) => s.pin);
@@ -17,6 +18,7 @@ export function InfoPanel() {
   const { data: obj, isPending } = useObjectDetail(selectedId);
   const { data: all } = useAllObjects();
   const [showWhy, setShowWhy] = useState(false);
+  const frame = useExplorer((s) => s.frame);
 
   const pinned = (all ?? []).filter((o) => pinnedIds.includes(o.id));
   const caveats = computeCaveats({ selected: obj ?? null, pinned, compared: pinned });
@@ -26,7 +28,7 @@ export function InfoPanel() {
   return (
     <aside
       aria-label="নির্বাচিত বস্তুর তথ্য"
-      className="flex flex-col overflow-hidden border-l border-border-subtle bg-panel"
+      className={embedded ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-panel' : 'flex flex-col overflow-hidden border-l border-border-subtle bg-panel'}
     >
       <header className="border-b border-border-subtle px-4 py-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">তথ্য</h2>
@@ -55,7 +57,10 @@ export function InfoPanel() {
             {obj.summary && <p className="text-[12px] text-ink-subtle">{obj.summary}</p>}
 
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
-              <Field label="স্থানাঙ্ক (Mpc)">
+              <Field label={`Render অবস্থান (${frame})`}>
+                {(() => { const p = positionForFrame(obj, frame); return `(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`; })()}
+              </Field>
+              <Field label="Source comoving (Mpc)">
                 ({obj.positionMpc.x.toFixed(1)}, {obj.positionMpc.y.toFixed(1)}, {obj.positionMpc.z.toFixed(1)})
               </Field>
               {obj.redshift && <Field label="redshift">z = {obj.redshift.value.toFixed(3)}</Field>}
@@ -65,7 +70,7 @@ export function InfoPanel() {
             </dl>
 
             <div className="flex flex-wrap gap-1.5">
-              <ActionButton onClick={() => setCamera({ position: [obj.positionMpc.x + 40, obj.positionMpc.y + 30, obj.positionMpc.z + 40], target: [obj.positionMpc.x, obj.positionMpc.y, obj.positionMpc.z] })}>
+              <ActionButton onClick={() => { const p = positionForFrame(obj, frame); setCamera({ position: [p.x + 40, p.y + 30, p.z + 40], target: [p.x, p.y, p.z] }); }}>
                 <Focus size={14} /> ফোকাস
               </ActionButton>
               <ActionButton onClick={() => pin(obj.id)}>
@@ -97,6 +102,10 @@ export function InfoPanel() {
                   </p>
                 ))}
               </section>
+            )}
+
+            {frame === 'lightcone' && obj.vLosKms === undefined && (
+              <p className="text-[11px] text-ink-muted">এই বস্তুর line-of-sight velocity অনুপস্থিত — Observed/Comoving টগলে এর অবস্থান বদলাবে না; velocity বানানো হয়নি।</p>
             )}
 
             {obj.distanceMpc && (

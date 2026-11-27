@@ -16,9 +16,12 @@ import json
 import math
 import time
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import asdict
+from functools import lru_cache
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pyarrow as pa
 import pyarrow.ipc as ipc
@@ -37,10 +40,24 @@ OBJECTS = {o["id"]: o for o in DATASET["objects"]}
 APP_VERSION = "0.1.0"
 _PREREG_SECRET = b"cosmos-dev-secret-change-in-production"
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Warm binary/columnar runtimes before /health reports ready. Otherwise the
+    # first Arrow tile pays PyArrow's one-time table initialization (~0.7 s).
+    pa.table({"warmup": np.zeros(1, dtype="u1")})
+    con = duckdb.connect()
+    try:
+        con.execute("SELECT 1").fetchall()
+    finally:
+        con.close()
+    yield
+
+
 app = FastAPI(title="COSMOS API", version=APP_VERSION,
-              description="Masterplan s9.6 - all data carries evidence labels.")
+              description="Masterplan s9.6 - all data carries evidence labels.",
+              lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
-                   allow_headers=["*"])
+                   allow_headers=["*"], expose_headers=["X-Evidence", "X-Rows"])
 
 # ---------------------------------------------------------------- runs store
 def _seed_run() -> SimulationRun:
@@ -202,23 +219,41 @@ def cone_legacy(q: ConeQuery):
 
 
 # ---------------------------------------------------------------- tiles (DuckDB)
+@lru_cache(maxsize=1)
+def _comoving_grid():
+    """Vectorized Planck18 chi(z) lookup for SIM tile generation."""
+    cosmo = Cosmology(ParameterSet.named("Planck18"))
+    z = np.linspace(0.0, 20.0, 16_385)
+    integrand = 1.0 / cosmo.E(z)
+    integral = np.concatenate(([0.0], np.cumsum(
+        (integrand[:-1] + integrand[1:]) * 0.5 * np.diff(z))))
+    return z, integral * (299792.458 / cosmo.H0)
+
+
+@lru_cache(maxsize=128)
 def _tile_table(level: int, tile_id: int) -> pa.Table:
     """Deterministic SIM galaxies for a tile (seed = level*100000+tile_id)."""
-    import duckdb
     rng = np.random.default_rng(level * 100000 + tile_id)
     n = 2000
     ra = rng.uniform(0, 360, n)
     dec = np.degrees(np.arcsin(rng.uniform(-1, 1, n)))
     z = rng.exponential(0.4, n)
+    # Every row inherits SIM from the response's X-Evidence header. Avoid a
+    # redundant per-row Python string array (its cold Arrow initialization
+    # dominated tile latency); the Explorer applies the SIM label to each row.
+    z_grid, chi_grid = _comoving_grid()
+    chi = np.interp(z, z_grid, chi_grid)
     tbl = pa.table({"id": np.arange(n, dtype="u8"),
                     "ra": ra.astype("f4"), "dec": dec.astype("f4"),
-                    "z_cos": z.astype("f4"),
-                    "log_mstar": rng.normal(10, 0.8, n).astype("f4"),
-                    "evidence": pa.array(["SIM"] * n)})
+                    "z_cos": z.astype("f4"), "chi": chi.astype("f4"),
+                    "log_mstar": rng.normal(10, 0.8, n).astype("f4")})
     con = duckdb.connect()
-    con.register("tile_tbl", tbl)
-    return con.sql(
-        "SELECT * FROM tile_tbl WHERE z_cos < 2.0 ORDER BY id").to_arrow_table()
+    try:
+        con.register("tile_tbl", tbl)
+        return con.sql(
+            "SELECT * FROM tile_tbl WHERE z_cos < 2.0 ORDER BY id").to_arrow_table()
+    finally:
+        con.close()
 
 
 @app.get("/v1/lightcone/tiles/{level}/{tile_id}")

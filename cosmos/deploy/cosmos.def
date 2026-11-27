@@ -1,0 +1,27 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends libgomp1 git \
+        && rm -rf /var/lib/apt/lists/*
+    pip install --no-cache-dir "numpy<3" "scipy<2" "astropy<9" "pyarrow<27" fastapi uvicorn duckdb httpx pytest PyYAML pglast
+
+%files
+    ../engine/reference-python/src /opt/cosmos/engine/reference-python/src
+    ../datasets /opt/cosmos/datasets
+    ../services/api /opt/cosmos/services/api
+    ../scientific-knowledge /opt/cosmos/scientific-knowledge
+    ../validation /opt/cosmos/validation
+    ../tests /opt/cosmos/tests
+    ../tools /opt/cosmos/tools
+
+%environment
+    export PYTHONPATH=/opt/cosmos/engine/reference-python/src:/opt/cosmos:/opt
+    export PYTHONDONTWRITEBYTECODE=1
+
+%runscript
+    exec python -m uvicorn services.api.main:app --host 0.0.0.0 --port 8000
+
+%test
+    python -c "from cosmos_engine import Cosmology, ParameterSet; assert Cosmology(ParameterSet.named('Planck18')).D_L(1.0) > 6000"
+    python -m pytest /opt/cosmos/tests -q

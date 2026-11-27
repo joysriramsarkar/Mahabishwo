@@ -1,0 +1,15 @@
+name: Planck18
+H0: 67.66
+H0_sigma: 0.42
+Om0: 0.30966
+Ob_h2: 0.02242
+Oc_h2: 0.11933
+sigma8: 0.8102
+ns: 0.9665
+tau: 0.0561
+Tcmb: 2.72548
+Neff: 3.044
+sum_mnu_eV: 0.06
+w0: -1.0
+wa: 0.0
+source: "Planck Collaboration 2020 (astropy Planck18)"

@@ -7,10 +7,11 @@ import { useExplorer } from '@/state/explorer';
 interface Props {
   onCameraChanged: (c: { position: [number, number, number]; target: [number, number, number] }) => void;
   onStartClock: () => void;
+  reducedMotion?: boolean;
 }
 
 /** Ties OrbitControls to the store; throttles camera writes. */
-export function SceneSetup({ onCameraChanged }: Props) {
+export function SceneSetup({ onCameraChanged, reducedMotion = false }: Props) {
   const controls = useRef<OrbitControlsImpl>(null);
   const { camera } = useThree();
   const lastWrite = useRef(0);
@@ -42,7 +43,7 @@ export function SceneSetup({ onCameraChanged }: Props) {
   return (
     <OrbitControls
       ref={controls}
-      enableDamping
+      enableDamping={!reducedMotion}
       dampingFactor={0.08}
       minDistance={12}
       maxDistance={8000}

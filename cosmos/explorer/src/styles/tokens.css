@@ -12,7 +12,7 @@
   /* Text */
   --text-primary: #F2F5FA;
   --text-secondary: #A2AEC0;
-  --text-muted: #6B7894;
+  --text-muted: #8290AA; /* WCAG AA >=4.5:1 on --bg-panel (masterplan token adjusted) */
 
   /* Accents */
   --accent-primary: #56D4E8;
@@ -45,6 +45,7 @@
 [data-evidence='observed']      { --evidence-color: var(--accent-primary); }
 [data-evidence='reconstructed'] { --evidence-color: var(--accent-model); }
 [data-evidence='simulated']     { --evidence-color: #7DD3FC; }
+[data-evidence='mock']          { --evidence-color: #F0B35A; }
 [data-evidence='unknown']       { --evidence-color: var(--accent-uncertainty); }
 
 /* Focus ring */

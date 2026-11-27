@@ -69,6 +69,26 @@ def test_lpt_place_particles_order1_and_order2():
     assert np.all((x1 >= 0) & (x1 < 100.0))
 
 
+def test_pm_rejects_invalid_inputs():
+    from cosmos_engine.pm import cic_deposit
+    with pytest.raises(ValueError):
+        cic_deposit(np.empty((0, 3)), 8, 50)
+    with pytest.raises(ValueError):
+        cic_deposit(np.zeros((2, 2)), 8, 50)
+    with pytest.raises(ValueError):
+        cic_deposit(np.zeros((2, 3)), 0, 50)
+
+
+def test_pm_rejects_invalid_step_counts():
+    from cosmos_engine.pm import run_pm, make_kvec
+    cosmo = Cosmology()
+    pos = np.zeros((1, 3))
+    with pytest.raises(ValueError):
+        run_pm(pos, pos, make_kvec(2, 10), 2, 10, cosmo, 0.5, 0.6, nsteps=0)
+    with pytest.raises(ValueError):
+        run_pm(pos, pos, make_kvec(2, 10), 2, 10, cosmo, 0.6, 0.5, nsteps=2)
+
+
 def test_pm_mass_conservation_and_motion():
     from cosmos_engine.ic import gaussian_field, lpt_displacement, place_particles
     from cosmos_engine.pm import cic_deposit, make_kvec, run_pm

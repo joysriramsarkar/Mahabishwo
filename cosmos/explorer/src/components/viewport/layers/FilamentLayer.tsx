@@ -1,36 +1,42 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { CosmicObject } from '@/types/cosmos';
+import { useAnimatedPositions } from '../useAnimatedPositions';
 
-/** Placeholder: draw a straight line between each supercluster pair whose
- * separation is < 40 Mpc. Real data would provide explicit filament paths. */
+/** Prototype filaments: straight paths between nearby superclusters (<80 Mpc).
+ * Production uses explicit reconstructed filament paths; none are invented. */
 export function FilamentLayer({
-  objects, opacity = 0.4,
-}: { objects: CosmicObject[]; opacity?: number }) {
-  const geometry = useMemo(() => {
+  objects, opacity = 0.4, transitionKey = 'initial', reducedMotion = false,
+}: { objects: CosmicObject[]; opacity?: number; transitionKey?: string; reducedMotion?: boolean }) {
+  const { positions, signature } = useMemo(() => {
     const supers = objects.filter((o) => o.type === 'supercluster');
     const pts: number[] = [];
+    const ids: string[] = [];
     for (let i = 0; i < supers.length; i++) {
       for (let j = i + 1; j < supers.length; j++) {
         const a = supers[i]!, b = supers[j]!;
         const d = Math.hypot(
           a.positionMpc.x - b.positionMpc.x,
           a.positionMpc.y - b.positionMpc.y,
-          a.positionMpc.z - b.positionMpc.z
+          a.positionMpc.z - b.positionMpc.z,
         );
         if (d < 80) {
-          pts.push(a.positionMpc.x, a.positionMpc.y, a.positionMpc.z);
-          pts.push(b.positionMpc.x, b.positionMpc.y, b.positionMpc.z);
+          pts.push(a.positionMpc.x, a.positionMpc.y, a.positionMpc.z,
+                   b.positionMpc.x, b.positionMpc.y, b.positionMpc.z);
+          ids.push(`${a.id}:${b.id}`);
         }
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    return g;
+    return { positions: new Float32Array(pts), signature: ids.join('|') };
   }, [objects]);
+  const geoRef = useAnimatedPositions(positions, signature, transitionKey, reducedMotion);
 
+  if (positions.length === 0) return null;
   return (
-    <lineSegments geometry={geometry}>
+    <lineSegments frustumCulled={false}>
+      <bufferGeometry ref={geoRef}>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
       <lineBasicMaterial color="#F0B35A" transparent opacity={opacity * 0.5} />
     </lineSegments>
   );

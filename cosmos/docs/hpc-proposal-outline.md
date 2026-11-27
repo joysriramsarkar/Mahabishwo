@@ -13,6 +13,12 @@
 4. ডেটা-ব্যবস্থাপনা: HDF5/Zarr/Parquet, লাইসেন্স-ম্যানিফেস্ট, DVC।
 5. মাইলস্টোন-গেট: P(k)/HMF ≤1–2%, COLA বনাম full N-body ≤2–5%, convergence ×2/4/8 (পর্যায় ৫ গেট)।
 
+## Deployment ও readiness (২৭ নভে. ২০২৬)
+- Docker API/PostgreSQL: `cosmos/deploy/docker-compose.yml`
+- Apptainer definition + `%test`: `cosmos/deploy/cosmos.def`
+- Fail-closed checker: `python cosmos/tools/hpc_readiness.py phase5 hpc`
+- এই ডেভেলপমেন্ট মেশিনে Docker/Apptainer/Slurm ও phase-5/7 solver executable নেই; checker `ready: false`, exit 2 দিয়েছে। কোনো HPC run বা scientific pass দাবি করা হচ্ছে না।
+
 ## ভবিষ্যৎ ডেটা-রিলিজ (পর্যায় ৮)
 Gaia DR4 (২ ডিসে. ২০২৬) — বেগ-ক্ষেত্র তুলনা; পূর্ণ ডাউনলোড নয়, ESA TAP/ADQL অঞ্চল-কোয়েরি।
-ট্র্যাকার: `cosmos/datasets/release-tracker.json`।
+ট্র্যাকার: `cosmos/datasets/release-tracker.json` ও adapter-scoped `cosmos/datasets/adapters/releases.json`।

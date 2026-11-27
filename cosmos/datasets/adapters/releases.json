@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-11-27",
+  "policy": "Status records public release metadata only, never data availability at an endpoint or completed downloads. Upcoming, results-only, and unverified releases are blocked until an adapter schema and rights notice are reviewed.",
+  "releases": [
+    {
+      "source": "gaia",
+      "release": "DR3",
+      "release_date": "2022-06-13",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "ESA Gaia Archive regional TAP/ADQL",
+      "note": "Enabled for CIRCLE queries with TOP <= 2000. The archive announced temporary DR4 preparation downtime; published status does not assert current endpoint uptime."
+    },
+    {
+      "source": "gaia",
+      "release": "DR4",
+      "expected": "2026-12-02",
+      "status": "upcoming",
+      "checked_on": "2026-11-27",
+      "access": "ESA Gaia Archive; public date announced for 2026-12-02 12:00 CET",
+      "note": "Not enabled and not ingested. Re-check the schema, archive service, and data licence after release; no DR4 scientific rows are fabricated."
+    },
+    {
+      "source": "cosmicflows",
+      "release": "Cosmicflows-4",
+      "release_date": "2023-02-15",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "EDD kallcf4 / Table 2; operator-supplied bounded local export",
+      "note": "The EDD page listed 55,874 rows on the check date. This adapter intentionally caps local input at 2,000 rows and never downloads the full catalogue."
+    },
+    {
+      "source": "mcconnachie",
+      "release": "2012",
+      "release_date": "2012-06-04",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "Published tables and VizieR J/AJ/144/4; bounded local export",
+      "note": "The original compilation is not a live API. Local column mappings must preserve the row's literature provenance."
+    },
+    {
+      "source": "desi",
+      "release": "DR1",
+      "release_date": "2025-03-19",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "DESI public DR1 directory; bounded local export",
+      "note": "Official release overview lists DR1 and EDR bulk data. FITS/Parquet require explicit external conversion to the supported tabular formats."
+    },
+    {
+      "source": "desi",
+      "release": "DR2",
+      "status": "published-results-only",
+      "checked_on": "2026-11-27",
+      "access": "DESI DR2 papers and supporting result products",
+      "note": "The official releases overview did not advertise a DR2 bulk spectroscopic release on the check date. No DR2 bulk adapter is enabled."
+    },
+    {
+      "source": "euclid",
+      "release": "DR1-Foundation",
+      "release_date": "2026-11-12",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "ESA Euclid science archive; bounded local export",
+      "note": "Published 2026-11-12 under CC BY-NC 3.0 IGO. Column names vary by product; release-specific mappings are mandatory."
+    },
+    {
+      "source": "planck",
+      "release": "2018",
+      "release_date": "2018-07-17",
+      "status": "published",
+      "checked_on": "2026-11-27",
+      "access": "Planck Legacy Archive parameter tables; bounded local table",
+      "note": "Parameter-table adapter only; no maps, likelihood grids, or chains are downloaded."
+    },
+    {
+      "source": "jwst",
+      "release": "public-metadata",
+      "status": "rolling",
+      "checked_on": "2026-11-27",
+      "access": "MAST Jdaviz v0.1 parameters endpoint for one PUBLIC data URI",
+      "note": "Only public metadata is enabled. Product-specific rights and the exclusive-access period are checked per response."
+    },
+    {
+      "source": "ligo",
+      "release": "GWTC",
+      "status": "rolling",
+      "checked_on": "2026-11-27",
+      "access": "GWOSC API v2 cumulative GWTC event list and default parameter metadata",
+      "note": "At most 25 event rows and one bounded metadata page. Event version and parameter source are retained; no strain/posterior files are fetched."
+    }
+  ]
+}

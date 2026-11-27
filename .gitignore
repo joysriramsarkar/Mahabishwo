@@ -5,6 +5,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 __pycache__/
+test-results/
+playwright-report/
 
 # Logs
 *.log

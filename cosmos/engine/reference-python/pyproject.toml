@@ -10,16 +10,16 @@ readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
 dependencies = [
-  "numpy>=1.26",
-  "scipy>=1.11",
-  "astropy>=6.0",
-  "pyarrow>=14",
+  "numpy>=1.26,<3",
+  "scipy>=1.11,<2",
+  "astropy>=6.0,<9",
+  "pyarrow>=14,<27",
 ]
 
 [project.optional-dependencies]
 healpix = ["healpy>=1.16"]
 api = ["fastapi>=0.110", "uvicorn>=0.29", "duckdb>=0.10", "pydantic>=2"]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27", "PyYAML>=6"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

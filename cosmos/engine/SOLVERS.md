@@ -17,3 +17,13 @@
 | G8 | UQ / emulator | ensemble + GP/PyTorch (EMU ট্যাগ, held-out >1–2% হলে নিষিদ্ধ) | orchestration manifest | ✅ কাঠামো |
 
 C++20/CUDA উৎপাদন সলভার: সচেতনভাবে পিছিয়ে (পর্যায় ৫+, HPC বরাদ্দ Q4-এর পর)।
+
+## Executable detection ≠ scientific validation
+`cosmos_engine.adapters` উপরের external solvers-এর PATH/PATHEXT detection, optional `--version` probe ও fail-closed invocation contract দেয়। executable না পেলে `UNAVAILABLE`; run template না থাকলেও `UNAVAILABLE`; process completion-কে scientific pass বলা হয় না। প্রকৃত generated-input/output adapter ও phase gate আলাদা কাজ।
+
+## locally executable numerical gates
+- Generated small-box IC-এর independent FFT shell P(k) recovery
+- Independent top-hat σ₈ integral ও Press–Schechter/Tinker08 HMF references
+- PM 2/4/8 **time-step** ladder versus 32-step reference + mass conservation
+- Spatial ×2/4/8, production P(k)/HMF ≤১–২%, COLA/full-N-body comparison: executable/data/HPC না থাকায় `UNAVAILABLE`
+- Emulator: supplied training data + untouched holdout; >১–২% error হলে `FAIL`; `EMU` evidence/provenance tag বাধ্যতামূলক

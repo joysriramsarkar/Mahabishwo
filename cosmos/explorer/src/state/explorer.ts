@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
-  CoordinateFrame, EvidenceKind, LayerId, ObjectType, ScopeKind,
+  CoordinateFrame, CosmicObject, EvidenceKind, LayerId, ObjectType, ScopeKind,
 } from '@/types/cosmos';
 import { DEFAULT_LAYERS } from '@/data/layers';
 
@@ -23,6 +23,7 @@ export const VIEW_MODES: ViewMode[] = [
 
 export type CompareMode = 'off' | 'side' | 'swipe' | 'overlay' | 'difference';
 export type H0SetName = 'Planck18' | 'SH0ES' | 'CCHP';
+export type MobileSheet = 'controls' | 'layers' | 'info' | 'time' | 'views' | null;
 
 export interface CameraState {
   position: [number, number, number];
@@ -65,6 +66,14 @@ export interface ExplorerState {
   /* Panels */
   panels: { layers: boolean; info: boolean };
 
+  /* Ephemeral mobile bottom-sheet (never persisted) */
+  mobileSheet: MobileSheet;
+
+  /* API-loaded Arrow tiles (SIM; never persisted) */
+  tileObjects: CosmicObject[];
+  tileStatus: 'idle' | 'loading' | 'loaded' | 'error';
+  tileError: string | null;
+
   /* Actions */
   setMode: (m: ViewMode) => void;
   setFrame: (f: CoordinateFrame) => void;
@@ -88,6 +97,10 @@ export interface ExplorerState {
   setCompareMode: (m: CompareMode) => void;
   setCompareSnapshot: (side: 'A' | 'B', id: string | null) => void;
   togglePanel: (p: keyof ExplorerState['panels']) => void;
+  openMobileSheet: (sheet: Exclude<MobileSheet, null>) => void;
+  closeMobileSheet: () => void;
+  setTileObjects: (objects: CosmicObject[]) => void;
+  setTileStatus: (status: ExplorerState['tileStatus'], error?: string | null) => void;
   resetView: () => void;
 }
 
@@ -122,6 +135,10 @@ export const useExplorer = create<ExplorerState>()(
       compare: { mode: 'off', snapshotA: null, snapshotB: null },
 
       panels: { layers: true, info: true },
+      mobileSheet: null,
+      tileObjects: [],
+      tileStatus: 'idle',
+      tileError: null,
 
       setMode: (mode) => set({ mode }),
       setFrame: (frame) => set({ frame }),
@@ -184,6 +201,10 @@ export const useExplorer = create<ExplorerState>()(
 
       togglePanel: (p) =>
         set((s) => ({ panels: { ...s.panels, [p]: !s.panels[p] } })),
+      openMobileSheet: (mobileSheet) => set({ mobileSheet }),
+      closeMobileSheet: () => set({ mobileSheet: null }),
+      setTileObjects: (tileObjects) => set({ tileObjects, tileStatus: 'loaded', tileError: null }),
+      setTileStatus: (tileStatus, tileError = null) => set({ tileStatus, tileError }),
 
       resetView: () => set({ camera: HOME_CAMERA, scaleMpc: 2000 }),
     }),

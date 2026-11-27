@@ -42,6 +42,13 @@ def test_cone_search_and_tile_arrow(client):
     t = client.get("/v1/lightcone/tiles/2/7")
     assert t.status_code == 200 and t.headers["x-evidence"] == "SIM"
     assert int(t.headers["x-rows"]) > 0
+    import pyarrow as pa
+    import pyarrow.ipc as ipc
+    reader = ipc.open_stream(t.content)
+    table = reader.read_all()
+    assert {"ra", "dec", "z_cos", "chi", "log_mstar"} <= set(table.column_names)
+    assert table.num_rows == int(t.headers["x-rows"])
+    assert pa.compute.all(pa.compute.greater(table["chi"], 0)).as_py()
 
 
 def test_mock_observation_job(client):

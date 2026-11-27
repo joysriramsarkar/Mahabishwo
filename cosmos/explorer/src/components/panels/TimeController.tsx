@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useExplorer } from '@/state/explorer';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 
 const MILESTONES = [
@@ -10,7 +11,8 @@ const MILESTONES = [
   { z: 0, label: 'আজ' },
 ];
 
-export function TimeController() {
+export function TimeController({ presentation = 'bar' }: { presentation?: 'bar' | 'sheet' }) {
+  const reducedMotion = useReducedMotion();
   const epochZ = useExplorer((s) => s.epochZ);
   const setEpochZ = useExplorer((s) => s.setEpochZ);
   const playing = useExplorer((s) => s.timePlaying);
@@ -21,7 +23,8 @@ export function TimeController() {
   const last = useRef<number>(performance.now());
 
   useEffect(() => {
-    if (!playing) return;
+    if (reducedMotion && playing) { toggle(); return; }
+    if (!playing || reducedMotion) return;
     const tick = (t: number) => {
       const dt = (t - last.current) / 1000;
       last.current = t;
@@ -32,15 +35,17 @@ export function TimeController() {
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-  }, [playing, speed, epochZ, setEpochZ, toggle]);
+  }, [playing, reducedMotion, speed, epochZ, setEpochZ, toggle]);
 
   // Convert z to a 0..1 timeline position (log scale for large z).
   const position = 1 - Math.log10(1 + epochZ) / Math.log10(1 + 1200);
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 border-t border-border-subtle bg-panel/90 px-4 py-2 backdrop-blur"
-      style={{ height: 'var(--timebar-h)' }}
+      className={presentation === 'sheet'
+        ? 'relative border-t border-border-subtle bg-panel px-4 py-3'
+        : 'absolute bottom-0 left-0 right-0 border-t border-border-subtle bg-panel/90 px-4 py-2 backdrop-blur'}
+      style={presentation === 'sheet' ? undefined : { height: 'var(--timebar-h)' }}
       role="region"
       aria-label="সময় নিয়ন্ত্রণ"
     >
@@ -48,8 +53,9 @@ export function TimeController() {
         <button
           type="button"
           onClick={toggle}
-          className="grid h-7 w-7 place-items-center rounded-md border border-border-subtle bg-base/60 text-ink hover:border-accent/50 hover:text-accent"
-          aria-label={playing ? 'বিরতি' : 'চালাও'}
+          disabled={reducedMotion}
+          className="grid h-11 w-11 place-items-center rounded-md border border-border-subtle bg-base/60 text-ink hover:border-accent/50 hover:text-accent disabled:opacity-40"
+          aria-label={playing ? 'বিরতি' : reducedMotion ? 'reduced-motion-এ প্লে নিষ্ক্রিয়; স্লাইডার ব্যবহার করুন' : 'চালাও'}
         >
           {playing ? <Pause size={14} /> : <Play size={14} />}
         </button>

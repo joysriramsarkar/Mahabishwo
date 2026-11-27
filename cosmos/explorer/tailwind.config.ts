@@ -3,6 +3,7 @@ import type { Config } from 'tailwindcss';
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
+    screens: { sm: '640px', md: '900px', lg: '1200px', xl: '1536px', '2xl': '1920px' },
     extend: {
       colors: {
         base: 'var(--bg-base)',

@@ -1,0 +1,15 @@
+# COSMOS API + reference engine (masterplan s14.2)
+FROM python:3.11-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+WORKDIR /opt/cosmos
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY cosmos/engine/reference-python/pyproject.toml cosmos/engine/reference-python/README.md /opt/cosmos/engine/
+COPY cosmos/engine/reference-python/src /opt/cosmos/engine/src
+RUN pip install --no-cache-dir "/opt/cosmos/engine[api]"
+COPY cosmos/datasets /opt/cosmos/datasets
+COPY cosmos/services/api /opt/cosmos/services/api
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)" || exit 1
+CMD ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

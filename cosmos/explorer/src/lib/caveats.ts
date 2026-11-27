@@ -66,6 +66,12 @@ export function computeCaveats(args: {
         text: 'Gpc-স্কেল কাঠামো: pattern-finding bias সম্ভব — পরিসংখ্যানগত তাৎপর্য (p-value) ছাড়া "বৃহত্তম কাঠামো" দাবি গ্রহণযোগ্য নয়।',
       });
     }
+    if (o.vLosKms === undefined) {
+      out.push({
+        id: 'unknown-rsd', icon: '≈', severity: 'info', objectId: o.id,
+        text: 'Line-of-sight peculiar velocity অজানা / পরিমাপ নেই — এই বস্তুর observed/comoving RSD displacement হিসাব করা যায়নি।',
+      });
+    }
     if (o.boundaryKind === 'flow-defined') {
       out.push({
         id: 'flow-boundary', icon: '≈', severity: 'info', objectId: o.id,

@@ -11,6 +11,13 @@ import numpy as np
 
 def cic_deposit(pos, N, L):
     """Cloud-in-cell deposit -> overdensity delta (equal-mass particles)."""
+    pos = np.asarray(pos, dtype=float)
+    if pos.ndim != 2 or pos.shape[1] != 3 or len(pos) == 0:
+        raise ValueError("pos must be a non-empty N x 3 array")
+    if not isinstance(N, int) or isinstance(N, bool) or N < 1:
+        raise ValueError("N must be a positive integer")
+    if not np.isfinite(L) or L <= 0 or not np.all(np.isfinite(pos)):
+        raise ValueError("L and positions must be finite; L must be positive")
     rho = np.zeros((N, N, N))
     g = pos / L * N
     i = np.floor(g).astype(int)
@@ -28,8 +35,20 @@ def cic_deposit(pos, N, L):
 
 def pm_force(delta, kvec, L, Om, a):
     """Solve Poisson equation in Fourier space (code units H0=1)."""
+    delta = np.asarray(delta, dtype=float)
+    if delta.ndim != 3 or not np.all(np.isfinite(delta)):
+        raise ValueError("delta must be a finite 3-D grid")
+    if not np.isfinite(Om) or not np.isfinite(a) or a <= 0:
+        raise ValueError("Om must be finite and a must be finite and positive")
     KX, KY, KZ, k = kvec
+    expected_shape = delta.shape[:2] + (delta.shape[2] // 2 + 1,)
+    if KX.shape != expected_shape or KY.shape != expected_shape or KZ.shape != expected_shape:
+        raise ValueError("k vector grids do not match the rfft density grid")
     k2 = k**2
+    if k.shape != delta.shape[:2] + (delta.shape[2] // 2 + 1,):
+        raise ValueError("k grid does not match the rfft density grid")
+    if np.any(k2 <= 0):
+        raise ValueError("k grid must use a non-zero sentinel at k=0")
     dk = np.fft.rfftn(delta)
     phik = -1.5 * Om / a * dk / k2
     phik[0, 0, 0] = 0
@@ -37,6 +56,9 @@ def pm_force(delta, kvec, L, Om, a):
 
 
 def cic_interp(field, pos, N, L):
+    pos = np.asarray(pos, dtype=float)
+    if pos.ndim != 2 or pos.shape[1] != 3 or not np.all(np.isfinite(pos)):
+        raise ValueError("pos must be a finite N x 3 array")
     g = pos / L * N
     i = np.floor(g).astype(int)
     f = g - i
@@ -70,6 +92,16 @@ def run_pm(pos, vel, kvec, N, L, cosmo, a_start, a_end, nsteps=20, on_step=None)
     """
     pos = np.array(pos, dtype=float, copy=True)
     vel = np.array(vel, dtype=float, copy=True)
+    if pos.shape != vel.shape or pos.ndim != 2 or pos.shape[1] != 3:
+        raise ValueError("pos and vel must be matching N x 3 arrays")
+    if not np.all(np.isfinite(pos)) or not np.all(np.isfinite(vel)):
+        raise ValueError("pos and vel must be finite")
+    if not isinstance(nsteps, int) or isinstance(nsteps, bool) or nsteps < 1:
+        raise ValueError("nsteps must be a positive integer")
+    if not np.isfinite(a_start) or not np.isfinite(a_end) or not 0 < a_start < a_end:
+        raise ValueError("require finite 0 < a_start < a_end")
+    if len(pos) == 0:
+        raise ValueError("particle arrays must be non-empty")
     a_grid = np.linspace(a_start, a_end, nsteps + 1)
     E = lambda a: float(cosmo.E(1 / a - 1))
     for a0, a1 in zip(a_grid[:-1], a_grid[1:]):
@@ -89,6 +121,10 @@ def run_pm(pos, vel, kvec, N, L, cosmo, a_start, a_end, nsteps=20, on_step=None)
 
 
 def total_mass_proxy(pos, N, L):
-    """Mass conservation proxy: CIC grid sum must equal particle count."""
+    """Dimensionless mass ratio: deposited cell volume over particle volume.
+
+    For equal-mass particles this should be one: CIC conserves the sum of
+    rho+1, so dividing by the particle count removes the N^3 grid factor.
+    """
     delta = cic_deposit(pos, N, L)
-    return float((delta + 1.0).sum() * (L / N) ** 3 / (L**3 / len(pos)))
+    return float((delta + 1.0).sum() / len(pos))

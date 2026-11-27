@@ -18,10 +18,11 @@
 
 | কোডবেস | ক্যাননিক্যাল কপি (রিপো-রুট থেকে) | অন্য কপি | অবস্থা |
 |---|---|---|---|
-| Explorer (React/TS) | `cosmos/explorer/` | `code/universe-explorer/` (আর্কাইভ); পুরনো `prototypes/explorer-react/` স্থানান্তরিত | ✅ ২৭ নভে. ২০২৬: tsc ০ এরর, vitest ১২/১২, vite build, Playwright e2e ৫/৫; ৯ ভিউ-মোড, Dual-Scope, Caveat, API-ক্লায়েন্ট |
+| Explorer (React/TS) | `cosmos/explorer/` | `code/universe-explorer/` (আর্কাইভ); পুরনো `prototypes/explorer-react/` স্থানান্তরিত | ✅ ২৭ নভে. ২০২৬: tsc ০ এরর, vitest ২৯/২৯, vite build, Playwright ১৪/১৪ (axe accessibility ২টি সহ); ৯ ভিউ-মোড, ~৯০০ ms RSD frame animation, mobile bottom-sheet, reduced-motion, Dual-Scope + L0 iframe, lazy Arrow IPC tile loader, bounded-heap LOD |
 | দিগন্ত প্রোটোটাইপ | `cosmos/prototypes/dighonto/` | `code/digant-prototype/` (আর্কাইভ) | ✅ স্ট্যাটিক সার্ভারে চালানো যায় |
 | স্কেল-কনসোল | `cosmos/prototypes/cosmos-engine/cosmos-engine.html` | — | ✅ একক ফাইল |
-| Python ইঞ্জিন | `cosmos/engine/reference-python/` (প্যাকেজ `cosmos_engine`) | `code/engine-reference/python/` (সোর্স-সংরক্ষণ); `annex/` (লিগ্যাসি) | ✅ ২৭ নভে. ২০২৬: pip-package, pytest ২৩/২৩ (astropy 1e-6 গেটসহ), পরিচ্ছন্ন মডিউল |
+| Python ইঞ্জিন | `cosmos/engine/reference-python/` (প্যাকেজ `cosmos_engine`) | `code/engine-reference/python/` (সোর্স-সংরক্ষণ); `annex/` (লিগ্যাসি) | ✅ pip-package, astropy 1e-6 গেট, ensemble P(k) normalization + per-shell 3σ audit, HMF/PM/EMU validation; full suite ৯৪/৯৪, local numerical ২৭/২৭ PASS (production solver/spatial gates UNAVAILABLE) |
 | ব্যাকএন্ড API | `cosmos/services/api/main.py` | — | ✅ FastAPI `/v1/` পূর্ণ সেট; লাইভ টেস্ট পাস |
-| ডেটা/স্কিমা/ভ্যালিডেশন | `cosmos/datasets/`, `cosmos/scientific-knowledge/`, `cosmos/validation/` | — | ✅ ingest-গেট ০ এরর; pipeline ১০/১০; acceptance ১০/১০ |
-| L0 সৌরজগৎ মডিউল | রিপো-রুট `src/` (নিজস্ব অ্যাপ) | — | ✅ build সফল; Explorer Local Scope থেকে handoff লিঙ্ক |
+| ডেটা/স্কিমা/ভ্যালিডেশন | `cosmos/datasets/`, `cosmos/scientific-knowledge/`, `cosmos/validation/` | — | ✅ ৮ উৎসের bounded adapter (pytest ৩৩/৩৩), ingest-গেট ০ এরর; pipeline ১০/১০; acceptance ১০/১০; numerical references বাস্তবায়িত (production solver gates UNAVAILABLE) |
+| L0 সৌরজগৎ মডিউল | রিপো-রুট `src/` (নিজস্ব অ্যাপ) | — | ✅ build সফল; Explorer Local Scope থেকে lazy iframe handoff |
+| Deployment/HPC readiness | `cosmos/deploy/`, `cosmos/tools/hpc_readiness.py` | — | ⚠️ Docker/Apptainer recipes ও fail-closed checker; এই মেশিনে HPC executables নেই (ready=false, exit 2) |

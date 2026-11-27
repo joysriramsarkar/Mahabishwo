@@ -36,6 +36,10 @@ describe('caveat system (s15.3 five triggers)', () => {
     const g = { ...base, type: 'galaxy' as const, redshift: { value: 12, unit: 'z' } };
     expect(computeCaveats({ selected: g }).some((c) => c.id === 'jwst-z10')).toBe(true);
   });
+  it('missing line-of-sight velocity is reported, not fabricated', () => {
+    const noVelocity = { ...base, vLosKms: undefined };
+    expect(computeCaveats({ selected: noVelocity }).some((c) => c.id === 'unknown-rsd')).toBe(true);
+  });
   it('two distant objects trigger not-coeval caveat', () => {
     const a = { ...base, id: 'a' };
     const b = { ...base, id: 'b', distanceMpc: { value: 900, unit: 'Mpc' } };
@@ -73,5 +77,6 @@ describe('demo data honesty (s15.1 rules 6/10)', () => {
     expect(gals.length).toBe(2400);
     expect(gals.every((g) => g.evidence === 'simulated')).toBe(true);
     expect(gals.every((g) => g.redshift !== undefined && g.ra !== undefined)).toBe(true);
+    expect(gals.every((g) => Number.isFinite(g.vLosKms))).toBe(true);
   });
 });

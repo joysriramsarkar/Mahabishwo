@@ -23,6 +23,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           three: ['three', '@react-three/fiber', '@react-three/drei'],
+          arrow: ['apache-arrow'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-slider', 'framer-motion'],
         },
       },

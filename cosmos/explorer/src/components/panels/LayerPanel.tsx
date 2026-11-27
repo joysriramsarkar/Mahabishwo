@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import type { ObjectType, EvidenceKind } from '@/types/cosmos';
 
-export function LayerPanel() {
+export function LayerPanel({ embedded = false }: { embedded?: boolean }) {
   const layers = useExplorer((s) => s.layers);
   const toggleLayer = useExplorer((s) => s.toggleLayer);
   const setOpacity = useExplorer((s) => s.setLayerOpacity);
@@ -18,7 +18,7 @@ export function LayerPanel() {
   return (
     <aside
       aria-label="স্তর ও ফিল্টার"
-      className="flex flex-col overflow-hidden border-r border-border-subtle bg-panel"
+      className={embedded ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-panel' : 'flex flex-col overflow-hidden border-r border-border-subtle bg-panel'}
     >
       <header className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">স্তর</h2>
@@ -68,9 +68,11 @@ export function LayerPanel() {
           />
         </Section>
       </div>
-      <footer className="border-t border-border-subtle px-3 py-2 text-[11px] text-ink-muted">
-        আকাশগঙ্গা ও তার অভ্যন্তরীণ বস্তু এই workspace থেকে বাদ।
-      </footer>
+      {!embedded && (
+        <footer className="border-t border-border-subtle px-3 py-2 text-[11px] text-ink-muted">
+          Extragalactic Scope-এ আকাশগঙ্গা ও তার অভ্যন্তরীণ বস্তু বাদ; Local Scope-এ পূর্ণ MW + L0।
+        </footer>
+      )}
     </aside>
   );
 }

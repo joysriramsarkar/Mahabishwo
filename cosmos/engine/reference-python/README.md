@@ -8,7 +8,7 @@
 | মূল ফাইল | এই প্যাকেজে | সংশোধন |
 |---|---|---|
 | `01_background_cosmology.py` | `cosmos_engine/cosmology.py` + `parameters.py` | import-এ demo সরানো; ParameterSet যুক্ত |
-| `02_gaussian_ic_2lpt.py` | `cosmos_engine/ic.py` | `np.trapz`→`trapezoid`; order=1-এ `psi2=None` crash ঠিক |
+| `02_gaussian_ic_2lpt.py` | `cosmos_engine/ic.py` | NumPy 1/2 integration fallback; order=1 crash ঠিক; FFT power normalization `N^1.5/L^1.5` সংশোধিত |
 | `03_pm_nbody_cola.py` | `cosmos_engine/pm.py` | হারানো `import numpy` যুক্ত |
 | `04_lightcone_shell_writer.py` | `cosmos_engine/lightcone.py` | `np`/`C_KMS` import, outdir তৈরি, healpy ঐচ্ছিক |
 | `05_hod_photometry.py` | `cosmos_engine/hod.py` | `np` import; array-safe M/L |
@@ -18,6 +18,20 @@
 | `10_observer_frame_astropy.py` | `cosmos_engine/observer.py` | হুবহু (পরিষ্কার ছিল) |
 | `12_simulation_orchestration_pseudocode.py` | `cosmos_engine/orchestration.py` | অবস্থা-মেশিনসহ বাস্তবায়িত |
 | `lightcone_record_schema.py` (সিনট্যাক্স-ভুল) | `cosmos_engine/schema.py` | সত্যিকারের `pyarrow.Schema` |
+
+## Phase-0/5 validation extensions
+| মডিউল | কাজ |
+|---|---|
+| `parameters.ParameterSet.from_yaml` | canonical YAML parameter sets load |
+| `power.py` | discrete Fourier-shell P(k), common-k comparison |
+| `hmf.py` | Press–Schechter/Tinker08, independent σ(M) quadrature |
+| `convergence.py` | executed PM 2/4/8 time-step ladder; spatial gate fail-closed |
+| `adapters.py` | external solver detection/invocation; unavailable কখনো pass নয় |
+| `emulator.py` | untouched holdout error gate + mandatory `EMU` provenance |
+| `orchestration.py` | R-20 pre-registration + R-21 manifest |
+
+## Compatibility
+Python 3.11+; NumPy 1.26/2.x (integration fallback), SciPy <2, Astropy <9, PyArrow <27। CI Python 3.11-এ pinned range install করে।
 
 ## ব্যবহার
 

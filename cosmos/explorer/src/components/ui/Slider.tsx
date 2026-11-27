@@ -24,6 +24,7 @@ export function Slider({ value, min = 0, max = 1, step = 0.01, onValueChange, la
         <RadixSlider.Range className="absolute h-full rounded-full bg-accent-dim" />
       </RadixSlider.Track>
       <RadixSlider.Thumb
+        aria-label={label}
         className={cn(
           'block h-3 w-3 rounded-full border border-accent bg-base',
           'hover:bg-accent-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'

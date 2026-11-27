@@ -63,6 +63,8 @@ export interface CosmicObject {
   ra?: number;
   dec?: number;
   redshift?: UncertainValue;
+  /** Line-of-sight peculiar velocity [km/s]. Absent = not measured/simulated. */
+  vLosKms?: number;
   distanceMpc?: UncertainValue;
   distanceKind?: DistanceKind;
   massMsun?: UncertainValue;

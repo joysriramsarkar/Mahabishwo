@@ -59,6 +59,23 @@ class ParameterSet:
         return replace(base, name=name, source="custom overrides on Planck18", **overrides)
 
     @classmethod
+    def from_yaml(cls, path) -> "ParameterSet":
+        """Load one canonical YAML parameter set (PyYAML is a dev/runtime extra)."""
+        from pathlib import Path
+        try:
+            import yaml
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("PyYAML required to load parameter-set YAML") from exc
+        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("parameter-set YAML must be a mapping")
+        allowed = {f for f in cls.__dataclass_fields__}
+        unknown = set(data) - allowed
+        if unknown:
+            raise ValueError(f"unknown ParameterSet fields: {sorted(unknown)}")
+        return cls(**data)
+
+    @classmethod
     def dual_h0_ensemble(cls) -> list["ParameterSet"]:
         """Mandatory pair for any local-distance result (masterplan s3.4/U15)."""
         return [cls.named("Planck18"), cls.named("SH0ES")]
