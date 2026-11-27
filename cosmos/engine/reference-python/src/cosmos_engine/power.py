@@ -122,7 +122,7 @@ def validate_power_spectrum(delta: np.ndarray, linear_power, *, n_grid: int,
     CIC/FFT effects; it is not a substitute for the production phase-5 gate.
 
     A single real field has fractional power scatter sqrt(2 / N_modes), where
-    N_modes counts conjugate-pair-independent modes in the full shell.  Shells below
+    N_modes is the full-shell real-field degree count.  Shells below
     ``min_modes_per_shell`` are reported as under-resolved and cannot turn the
     gate into PASS.  Use :func:`ensemble_power_spectrum` for low-k recovery.
     """

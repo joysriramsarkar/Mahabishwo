@@ -19,8 +19,8 @@ from cosmos_engine.convergence import (validate_pm_convergence,
                                        validate_pm_spatial_convergence)
 from cosmos_engine.emulator import (predict_emulator, require_emulator_gate,
                                     train_polynomial_emulator, validate_emulator)
-from cosmos_engine.hmf import (press_schechter, sigma_at_mass, tinker08,
-                               validate_hmf)
+from cosmos_engine.hmf import (matter_density, press_schechter, sigma_at_mass,
+                               tinker08, validate_hmf)
 from cosmos_engine.ic import gaussian_field, linear_pk, lpt_displacement, place_particles
 import cosmos_engine.ic as ic_module
 from cosmos_engine.pm import make_kvec
@@ -145,6 +145,19 @@ def test_power_comparison_fails_when_input_spectrum_is_wrong():
 
 
 # --- Independent Press--Schechter / Tinker HMF references --------------------
+def test_matter_density_units_and_sigma_mass_reference():
+    """rho_m is ~4e10 Msun/Mpc^3 and sigma(M) agrees with Simpson quadrature."""
+    cosmo = Cosmology()
+    rho_m = matter_density(cosmo)
+    numerical = _load_numerical()
+    assert rho_m == pytest.approx(numerical._reference_density(cosmo), rel=1e-10)
+    assert 3.5e10 < rho_m < 4.5e10
+    mass = np.logspace(10, 14, 8)
+    engine_sigma = sigma_at_mass(mass, None, lambda k: linear_pk(k, cosmo), cosmo)
+    reference_sigma = numerical._reference_sigma(mass, cosmo)
+    assert np.allclose(engine_sigma, reference_sigma, rtol=2e-3)
+
+
 def test_independent_sigma8_integral_and_hmf_references():
     numerical = _load_numerical()
     sigma8 = numerical.sigma8_reference()

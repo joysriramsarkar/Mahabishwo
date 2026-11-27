@@ -21,7 +21,7 @@
 - [x] PostgreSQL Object Registry: ১৮ টেবিল DDL (`cosmos/scientific-knowledge/schema/001_initial.sql`) + pglast grammar-যাচাই + CI-তে প্রকৃত Postgres migration; বাধ্যতামূলক ফিল্ডসহ
 - [x] Apache-2.0 `LICENSE` (cosmos/, দাপ্তরিক পাঠ্য) + ক্যাটালগ লাইসেন্স-ম্যানিফেস্ট (ingest-গেটে বাধ্যতামূলক)
 - [x] ADR প্রক্রিয়া (`cosmos/docs/adr/`: টেমপ্লেট + ADR-0001–0004)
-- [x] Python প্যাকেজিং: `cosmos-engine 0.1.0` pyproject, ফেন্স-মুক্ত পরিচ্ছন্ন মডিউল, সত্যিকারের Arrow স্কিমা, YAML ParameterSet loader; core engine ১৪/১৪, non-numerical suite ৬৭/৬৭, full suite ৯৪/৯৪ পাস
+- [x] Python প্যাকেজিং: `cosmos-engine 0.1.0` pyproject, ফেন্স-মুক্ত পরিচ্ছন্ন মডিউল, সত্যিকারের Arrow স্কিমা, YAML ParameterSet loader; core engine ১৪/১৪, non-numerical suite ৬৭/৬৭, full suite ৯৫/৯৫ পাস
 
 ## C. Explorer ফ্রন্টএন্ড (ট্র্যাক X)
 - [x] Mock-ডেটা → বাস্তব API-ক্লায়েন্ট (`VITE_COSMOS_API`; backend OBS/REC + SIM ডেমো মার্জ; অফলাইনে evidence-লেবেলসহ fallback)। ডেমো গ্যালাক্সির আগের ভুল `observed` লেবেল সংশোধন করে `SIM` করা হয়েছে
@@ -60,7 +60,7 @@
 ## G. ভ্যালিডেশন (ট্র্যাক V)
 - [~] ছয়-ধাপের সিঁড়ি: ধাপ ১–২ বাস্তবায়িত (unit/manufactured + analytic/astropy/independent numerical references); ধাপ ৩–৬ উৎপাদন solver/data/ভবিষ্যৎ observation-নির্ভর — R-20 pre-registration CLI ও R-21 provenance প্রস্তুত
 - [x] ১০টি পাইপলাইন-চেক অটোমেশন — `cosmos/validation/pipeline/checks.py` ১০/১০ PASS
-- [~] Numerical validation: independent σ₈/PS/Tinker HMF, executed PM 2/4/8 time-step ladder, generated-IC ensemble P(k) recovery ও EMU holdout gate-সহ local numerical suite ২৭/২৭ PASS; solver detection কেবল report করে — production phase-5/7 spatial/solver gates স্পষ্টভাবে UNAVAILABLE
+- [~] Numerical validation: independent σ₈/PS/Tinker HMF, executed PM 2/4/8 time-step ladder, generated-IC ensemble P(k) recovery ও EMU holdout gate-সহ local numerical suite ২৮/২৮ PASS; solver detection কেবল report করে — production phase-5/7 spatial/solver gates স্পষ্টভাবে UNAVAILABLE
 - [x] COSMOS 0.1-এর ১০টি গ্রহণযোগ্যতা-পরীক্ষা — `cosmos/validation/acceptance/test_acceptance.py` ১০/১০ PASS
 
 ## H. নিষেধাজ্ঞা (সর্বদা প্রযোজ্য)

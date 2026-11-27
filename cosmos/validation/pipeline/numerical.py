@@ -24,8 +24,7 @@ from cosmos_engine.convergence import validate_pm_convergence  # noqa: E402
 from cosmos_engine.emulator import (train_polynomial_emulator,  # noqa: E402
                                     predict_emulator, require_emulator_gate,
                                     validate_emulator)
-from cosmos_engine.hmf import (press_schechter, sigma_at_mass, tinker08,  # noqa: E402
-                               validate_hmf, variance_tophat)
+from cosmos_engine.hmf import press_schechter, sigma_at_mass, tinker08, variance_tophat  # noqa: E402
 from cosmos_engine.ic import gaussian_field, linear_pk            # noqa: E402
 from cosmos_engine.pm import make_kvec                             # noqa: E402
 from cosmos_engine.power import ensemble_power_spectrum            # noqa: E402
@@ -64,12 +63,21 @@ def generated_pk_reference(n_grid: int = 16, box_mpc: float = 100.0,
                       "input EH98 P(k) versus independent full-complex FFT ensemble shells")
 
 
+def _reference_density(cosmo: Cosmology) -> float:
+    """Independent critical-density calculation using astropy constants/units."""
+    import astropy.constants as const
+    import astropy.units as u
+    h0 = cosmo.H0 * u.km / u.s / u.Mpc
+    rho_crit = 3 * h0**2 / (8 * np.pi * const.G)
+    return float((cosmo.Om * rho_crit).to_value(u.Msun / u.Mpc**3))
+
+
 def _reference_sigma(mass: np.ndarray, cosmo: Cosmology) -> np.ndarray:
     """Independent Simpson-rule top-hat integral, separate from hmf.sigma_at_mass."""
     logk = np.linspace(np.log(1e-4 / cosmo.h), np.log(1e2 / cosmo.h), 2049)
     k = np.exp(logk)
     p = linear_pk(k, cosmo)
-    rho_m = cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * 43.007)
+    rho_m = _reference_density(cosmo)
     radius = (3 * mass / (4 * np.pi * rho_m)) ** (1 / 3)
     x = radius[:, None] * k[None, :]
     w = np.where(x < 0.05,
@@ -90,12 +98,16 @@ def ps_hmf_reference() -> NumericalResult:
     mass = np.logspace(10, 15, 12)
     sigma = _reference_sigma(mass, cosmo)
     measured = press_schechter(mass, sigma, cosmo)
-    result = validate_hmf(mass, measured, sigma, cosmo, model="press_schechter",
-                          tolerance=1e-10)
-    reference = "independent Simpson-rule sigma(M) and closed-form PS reference"
-    return NumericalResult("press_schechter_hmf_reference", result.status,
+    nu = 1.686 / sigma
+    reference_values = _reference_density(cosmo) / mass * np.sqrt(2 / np.pi) * nu * np.exp(-nu**2 / 2)
+    errors = np.abs(np.log(measured / reference_values))
+    maximum = float(errors.max())
+    status = "PASS" if maximum <= 1e-10 else "FAIL"
+    return NumericalResult("press_schechter_hmf_reference", status,
                            "analytic Press-Schechter dn/dlnM gate, not a simulated halo catalogue",
-                           reference, result.as_dict())
+                           "independent Simpson sigma(M), astropy critical-density units, closed-form PS",
+                           {"max_rel_error": maximum, "tolerance": 1e-10,
+                            "rho_m": _reference_density(cosmo), "errors": errors.tolist()})
 
 
 def tinker_hmf_reference() -> NumericalResult:
@@ -104,17 +116,22 @@ def tinker_hmf_reference() -> NumericalResult:
     mass = np.logspace(10, 15, 12)
     sigma = _reference_sigma(mass, cosmo)
     measured = tinker08(mass, sigma, cosmo)
-    result = validate_hmf(mass, measured, sigma, cosmo, model="tinker08", tolerance=1e-10)
-    reference = "independent Tinker08 Delta=200m z=0 Eq. (3) coefficients"
-    return NumericalResult("tinker_hmf_reference", result.status,
+    f_sigma = 0.186 * ((2.57 / sigma)**1.47 + 1) * np.exp(-1.19 / sigma**2)
+    reference_values = _reference_density(cosmo) / mass * f_sigma
+    errors = np.abs(np.log(measured / reference_values))
+    maximum = float(errors.max())
+    status = "PASS" if maximum <= 1e-10 else "FAIL"
+    return NumericalResult("tinker_hmf_reference", status,
                            "analytic Tinker08 dn/dlnM gate, not phase-5 HMF",
-                           reference, result.as_dict())
+                           "independent Tinker08 Delta=200m z=0 Eq. (3) coefficients and astropy density units",
+                           {"max_rel_error": maximum, "tolerance": 1e-10,
+                            "rho_m": _reference_density(cosmo), "errors": errors.tolist()})
 
 
 def sigma8_reference() -> NumericalResult:
     """Independent top-hat quadrature must recover the engine's target sigma8."""
     cosmo = Cosmology()
-    k = np.logspace(-4 / cosmo.h, 2 / cosmo.h, 4097)
+    k = np.logspace(-4, 2, 4097) / cosmo.h
     sigma8 = math.sqrt(variance_tophat(k, linear_pk(k, cosmo), 8 / cosmo.h))
     error = abs(sigma8 / cosmo.params.sigma8 - 1)
     status = "PASS" if error <= 0.005 else "FAIL"

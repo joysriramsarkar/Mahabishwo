@@ -18,6 +18,15 @@ _BETA = np.array([1.47, 1.52, 1.56, 1.61, 1.87, 2.13, 2.30, 2.53, 2.66])
 _GAMMA = np.array([2.57, 2.25, 2.05, 1.87, 1.59, 1.51, 1.46, 1.44, 1.41])
 _PHI = np.array([1.19, 1.27, 1.34, 1.45, 1.58, 1.80, 1.97, 2.24, 2.44])
 
+# G in (km/s)^2 Mpc / M_sun.  H0 is km/s/Mpc, so 3 H0^2/(8 pi G)
+# is M_sun/Mpc^3.  Keeping the conversion explicit prevents a 1e10 unit error.
+_G_MPC_KMS2_MSUN = 4.300917270e-9
+
+
+def matter_density(cosmo) -> float:
+    """Present-day matter density rho_m = Omega_m rho_crit [M_sun/Mpc^3]."""
+    return cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * _G_MPC_KMS2_MSUN)
+
 
 @dataclass(frozen=True)
 class HmfComparison:
@@ -70,7 +79,7 @@ def press_schechter(mass, sigma, cosmo, *, delta_c: float = 1.686,
     sigma = np.asarray(sigma, dtype=float)
     if sigma.shape != mass.shape or np.any(sigma <= 0) or not np.all(np.isfinite(sigma)):
         raise ValueError("sigma must be positive and match mass")
-    rho_m = cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * 43.007)  # M_sun/Mpc^3
+    rho_m = matter_density(cosmo)
     nu = delta_c / sigma
     # Stable evaluation of sqrt(2/pi)*nu*exp(-nu^2/2).
     log_pdf = 0.5 * np.log(2 / np.pi) + np.log(nu) - 0.5 * nu**2
@@ -105,7 +114,7 @@ def tinker08(mass, sigma, cosmo, *, delta: float = 200.0,
     if not 200.0 <= delta <= 3200.0:
         raise ValueError("Tinker08 supports 200 <= Delta <= 3200")
     mass = _validate_mass(mass)
-    rho_m = cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * 43.007)
+    rho_m = matter_density(cosmo)
     return rho_m / mass * tinker08_fsigma(
         sigma, delta=delta, redshift=redshift, mass_definition=mass_definition)
 
@@ -137,10 +146,10 @@ def variance_tophat(k, power, radius: float) -> float:
 def sigma_at_mass(mass, k, power, cosmo) -> np.ndarray:
     """Compute sigma(M) from a sampled linear P(k) by 3-D quadrature.
 
-    ``power`` is a callable P(k).  The optional ``k`` argument is retained for
-    a supplied sample grid; if omitted, a dense 1e-4--1e2 h/Mpc grid is used.
-    Gauss-Legendre quadrature in log(k) is independent of the production
-    ``ic.linear_pk`` sigma8 normalization mesh.
+    ``power`` is a callable P(k) with k in 1/Mpc.  The optional ``k`` argument
+    accepts a supplied angular-k grid; if omitted, a dense grid spanning
+    1e-4--1e2 h/Mpc is used.  Gauss-Legendre quadrature in log(k) is independent
+    of the production ``ic.linear_pk`` sigma8 normalization mesh.
     """
     mass = _validate_mass(mass)
     if k is None:
@@ -159,10 +168,9 @@ def sigma_at_mass(mass, k, power, cosmo) -> np.ndarray:
     logkq = 0.5 * (logk[-1] - logk[0]) * nodes + 0.5 * (logk[-1] + logk[0])
     kq = np.exp(logkq)
     pq = np.interp(logkq, logk, pp)
-    rho_m = cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * 43.007)
-    # The supplied grid is in h/Mpc, so convert the physical Mpc radius to
-    # h^-1 Mpc before multiplying by the angular-k samples.
-    radius = (3 * mass / (4 * np.pi * rho_m)) ** (1 / 3) / cosmo.h
+    rho_m = matter_density(cosmo)
+    # k is sampled in 1/Mpc, matching linear_pk's documented convention.
+    radius = (3 * mass / (4 * np.pi * rho_m)) ** (1 / 3)
     x = radius[:, None] * kq[None, :]
     window = np.empty_like(x)
     small = x < 0.05
@@ -196,7 +204,7 @@ def validate_hmf(mass, measured, sigma, cosmo, *, model: str = "tinker08",
     sigma = np.asarray(sigma, dtype=float)
     if sigma.shape != mass.shape or np.any(sigma <= 0):
         raise ValueError("sigma must be positive and match mass")
-    rho_m = cosmo.Om * 3 * cosmo.H0**2 / (8 * np.pi * 43.007)
+    rho_m = matter_density(cosmo)
     if model == "press_schechter":
         reference = rho_m / mass * np.sqrt(2 / np.pi) * 1.686 / sigma * np.exp(
             -0.5 * (1.686 / sigma)**2)
