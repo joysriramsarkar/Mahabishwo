@@ -1,0 +1,64 @@
+universe-sim/
+├── core/
+│   ├── cosmology/          # a(t), distances, growth factor
+│   ├── domain/             # Peano-Hilbert, MPI decomposition
+│   ├── timestep/           # hierarchical binning
+│   ├── io/                 # HDF5, compression, checkpointing
+│   └── units/              # internal unit system, conversions
+├── gravity/
+│   ├── treepm/
+│   ├── fmm/
+│   ├── direct_nbody/       # Hermite, regularization (KS, chain)
+│   └── softening/
+├── hydro/
+│   ├── sph/
+│   ├── moving_mesh/        # Voronoi tessellation
+│   ├── amr/
+│   ├── riemann/            # HLLD, HLLC, Roe
+│   └── mhd/                # CT, div-B cleaning, non-ideal terms
+├── radiation/
+│   ├── m1_moment/
+│   ├── ray_trace/
+│   └── dust_rt/
+├── chemistry/
+│   ├── network/            # species, reaction rates
+│   ├── cooling_tables/     # CLOUDY-generated
+│   └── implicit_solver/    # CVODE interface
+├── stars/
+│   ├── formation/          # sink particles, SF criteria
+│   ├── evolution/          # isochrones, MIST/PARSEC tracks
+│   ├── imf/
+│   ├── feedback/           # SNe, winds, radiation pressure
+│   ├── nucleosynthesis/    # yield tables + networks
+│   └── binaries/           # BSE/COMPAS-style
+├── blackholes/
+│   ├── seeding/
+│   ├── accretion/
+│   ├── feedback/
+│   ├── dynamics/           # dynamical friction, mergers
+│   └── grmhd/              # Kerr-Schild, HARM-style
+├── cosmicrays/
+├── relativity/
+│   ├── bssn/
+│   ├── z4c/
+│   └── horizon_finder/
+├── initial_conditions/
+│   ├── transfer/           # CAMB/CLASS interface
+│   ├── lpt/                # 2LPT, 3LPT
+│   ├── constrained/        # Wiener filter, RZA, BORG
+│   └── zoom/               # nested region setup
+├── analysis/
+│   ├── halo_finder/
+│   ├── merger_tree/
+│   ├── mock_obs/           # SPS, dust RT, instrument sim
+│   ├── streams/            # tidal stream identification
+│   └── in_situ/
+├── validation/
+│   ├── unit_tests/
+│   ├── standard_problems/  # Sod, Sedov, Zel'dovich, Evrard...
+│   ├── convergence/
+│   └── observational/
+└── uq/
+    ├── emulator/
+    ├── sampling/
+    └── sensitivity/

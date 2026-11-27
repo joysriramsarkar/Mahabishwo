@@ -1,0 +1,18 @@
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ Run: Ensemble-042 │ Mode: Sky │ OBS/SIM │ Observer │ Search │ Compare │
+├──────────────┬───────────────────────────────────┬───────────────────┤
+│ Layers       │                                   │ Object Inspector  │
+│              │                                   │                   │
+│ ☑ Galaxies   │       3D / Sky / Light Cone       │ Galaxy ID         │
+│ ☑ Halos      │                                   │ z, distance       │
+│ ☐ Dark matter│        মূল Interactive View       │ mass, SFR         │
+│ ☑ IGM        │                                   │ host halo         │
+│ ☐ Gas density│                                   │ merger history    │
+│ ☐ CMB        │                                   │ uncertainty       │
+│ ☐ X-ray      │                                   │ provenance        │
+│ ☐ Lensing    │                                   │                   │
+├──────────────┴───────────────────────────────────┴───────────────────┤
+│ z / Lookback Time / Cosmic Time ───────────────●─────────────────── │
+│ Scale: 10 Mpc │ Projection: Light Cone │ Quality: Adaptive │ Export │
+└──────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,9 @@
+1. Gravity kick (Δt/2)
+2. Hydro/MHD drift + flux
+3. Radiative transfer (sub-cycled)
+4. Chemistry + cooling (implicit, sub-cycled)
+5. Star formation / sink accretion
+6. Stellar evolution + feedback injection
+7. BH accretion + feedback
+8. Cosmic ray transport
+9. Gravity kick (Δt/2)

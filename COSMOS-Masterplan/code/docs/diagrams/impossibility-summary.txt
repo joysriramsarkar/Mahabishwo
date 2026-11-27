@@ -1,0 +1,12 @@
+মহাবিশ্ব simulate করতে দরকার:
+  ✗ 10¹²²+ bit memory        → মহাবিশ্বের energy-এর চেয়ে বেশি
+  ✗ 10¹⁵¹+ operations        → real-time-এর চেয়ে ধীর
+  ✗ Unknown quantum gravity  → starting point-ই নেই
+  ✗ Exponential Hilbert space → quantum state store করা যায় না
+  ✗ True randomness          → reproduce করা যায় না
+  ✗ Self-reference           → simulating simulator-এর problem
+  ✗ Landauer limit           → thermodynamically forbidden
+
+∴ মহাবিশ্বের সম্পূর্ণ, exact, real-time simulation 
+   বর্তমান (এবং সম্ভবত চিরকালের) পদার্থবিজ্ঞানের 
+   আওতায় অসম্ভব।

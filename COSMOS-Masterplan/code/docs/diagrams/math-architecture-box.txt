@@ -1,0 +1,17 @@
+┌─────────────────────────────────────────────────────┐
+│           STATE VECTOR / WAVEFUNCTION Ψ              │
+│         (Hilbert Space, dimension ~ 10^10^10^10)    │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  H |Ψ⟩ = iℏ ∂|Ψ⟩/∂t    (Schrödinger equation)     │
+│  G_{μν} = (8πG/c⁴)T_{μν}  (Einstein)              │
+│  L = L_GSM + L_GR + L_dark  (Lagrangian)          │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│  SYMMETRIES:                                        │
+│  • Poincaré invariance (local)                     │
+│  • Gauge invariance SU(3)×SU(2)×U(1)              │
+│  • CPT symmetry                                    │
+│  • Baryon/Lepton number (approximate)              │
+│  • CP violation (CKM matrix)                       │
+└─────────────────────────────────────────────────────┘

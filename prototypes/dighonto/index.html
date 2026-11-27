@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050914">
+  <title>দিগন্ত — মহাবিশ্ব অনুসন্ধান</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- প্রধান হেডার -->
+  <header class="topbar">
+    <button
+      id="layersToggle"
+      class="icon-button drawer-button"
+      aria-label="লেয়ার প্যানেল খুলুন"
+      aria-controls="leftPanel"
+      aria-expanded="false">☰</button>
+
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">◉</span>
+      <div class="brand-text">
+        <strong>দিগন্ত</strong>
+        <small>মহাবিশ্ব অনুসন্ধান</small>
+      </div>
+    </div>
+
+    <form id="searchForm" class="search" role="search">
+      <input
+        id="searchInput"
+        type="search"
+        placeholder="ডেমো ID: DEMO-000125"
+        aria-label="ডেমো অবজেক্টের ID লিখুন"
+        autocomplete="off">
+      <button type="submit" aria-label="অবজেক্ট খুঁজুন">⌕</button>
+    </form>
+
+    <button id="helpButton" class="quiet-button">সাহায্য</button>
+
+    <button
+      id="saveButton"
+      class="primary-button"
+      title="বর্তমান ভিউ JSON হিসেবে সংরক্ষণ">
+      ↓ <span class="save-label">ভিউ JSON</span>
+    </button>
+
+    <button
+      id="inspectorToggle"
+      class="icon-button drawer-button"
+      aria-label="ইনস্পেক্টর খুলুন"
+      aria-controls="rightPanel"
+      aria-expanded="false">ⓘ</button>
+  </header>
+
+  <div class="workspace">
+
+    <!-- বাম প্যানেল -->
+    <aside id="leftPanel" class="panel layers-panel" aria-label="লেয়ার ও ফিল্টার">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">WORKSPACE</span>
+          <h2>লেয়ার ও ফিল্টার</h2>
+        </div>
+        <button
+          class="icon-button drawer-close"
+          data-close-panels
+          aria-label="প্যানেল বন্ধ করুন">×</button>
+      </div>
+
+      <section class="panel-section">
+        <h3>প্রদর্শন</h3>
+
+        <label class="check-row">
+          <input id="showGalaxies" type="checkbox" checked>
+          <span>গ্যালাক্সি <small>ডেমো পয়েন্ট-ক্যাটালগ</small></span>
+        </label>
+
+        <label class="check-row">
+          <input id="showGrid" type="checkbox" checked>
+          <span>স্থানাঙ্ক গ্রিড</span>
+        </label>
+
+        <label class="check-row">
+          <input id="showObserver" type="checkbox" checked>
+          <span>পর্যবেক্ষকের অবস্থান</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h3>ভিজ্যুয়াল এনকোডিং</h3>
+
+        <label class="field-label" for="colorMode">রং অনুযায়ী</label>
+        <select id="colorMode">
+          <option value="redshift">রেডশিফট</option>
+          <option value="mass">নাক্ষত্রিক ভর</option>
+        </select>
+
+        <p class="hint">রং তথ্য বোঝায়; এটি গ্যালাক্সির প্রকৃত রং নয়।</p>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-title-row">
+          <h3>ন্যূনতম নাক্ষত্রিক ভর</h3>
+          <output id="massOutput" class="mono">8.0</output>
+        </div>
+
+        <label class="hint" for="minMass">
+          log₁₀(M★ / M☉)
+        </label>
+
+        <input
+          id="minMass"
+          type="range"
+          min="8"
+          max="12"
+          step="0.1"
+          value="8">
+
+        <button id="resetFilters" class="wide-button">
+          ফিল্টার রিসেট
+        </button>
+      </section>
+
+      <section class="panel-section">
+        <h3>অতিরিক্ত ডেটা লেয়ার</h3>
+
+        <label class="check-row unavailable">
+          <input type="checkbox" disabled>
+          <span>CMB মানচিত্র <small>ডেটা সংযুক্ত হয়নি</small></span>
+        </label>
+
+        <label class="check-row unavailable">
+          <input type="checkbox" disabled>
+          <span>মহাকর্ষীয় তরঙ্গ <small>ডেটা সংযুক্ত হয়নি</small></span>
+        </label>
+
+        <label class="check-row unavailable">
+          <input type="checkbox" disabled>
+          <span>জরিপের সীমানা <small>ডেটা সংযুক্ত হয়নি</small></span>
+        </label>
+      </section>
+
+      <section class="model-card">
+        <span class="eyebrow">DISTANCE MODEL</span>
+        <h3>সমতল ΛCDM</h3>
+        <p class="mono">H₀ = 67.7 km/s/Mpc<br>Ωm = 0.311</p>
+        <p class="hint">
+          শুধু UI-ডেমোর আনুমানিক দূরত্ব ও lookback রূপান্তর।
+          এটি precision cosmology নয়।
+        </p>
+      </section>
+    </aside>
+
+    <!-- কেন্দ্রীয় ভিউ -->
+    <main class="center-panel">
+      <nav class="view-toolbar" aria-label="দৃশ্য নির্বাচন">
+        <div class="segmented">
+          <button id="mode3d" class="active" aria-pressed="true">
+            ৩ডি মানচিত্র
+          </button>
+          <button id="modeSky" aria-pressed="false">
+            আকাশচিত্র
+          </button>
+          <button disabled title="আলাদা snapshot ডেটা সংযুক্ত হয়নি">
+            Snapshot · ডেটা নেই
+          </button>
+        </div>
+
+        <button
+          id="resetCamera"
+          class="icon-button"
+          title="ক্যামেরা রিসেট"
+          aria-label="ক্যামেরা রিসেট">↺</button>
+      </nav>
+
+      <section id="stage" class="stage" aria-label="ইন্টার‌্যাক্টিভ মানচিত্র">
+        <canvas
+          id="universe"
+          tabindex="0"
+          aria-label="কৃত্রিম গ্যালাক্সি-ক্যাটালগের ইন্টার‌্যাক্টিভ মানচিত্র"
+          aria-describedby="modeCaption"></canvas>
+
+        <div class="stage-heading">
+          <span class="eyebrow">OBSERVABLE UNIVERSE · UI DEMO</span>
+          <h1>মহাবিশ্বের মানচিত্র</h1>
+          <p id="modeCaption">
+            পর্যবেক্ষককেন্দ্রিক ৩ডি আলোক-শঙ্কুর বিন্যাস।
+          </p>
+
+          <div class="badge-row">
+            <span class="badge warning">কৃত্রিম ডেটা</span>
+            <span class="badge">আকাশগঙ্গা: পর্যবেক্ষক মাত্র</span>
+          </div>
+        </div>
+
+        <div id="reticle" class="selection-reticle" hidden></div>
+
+        <div class="viewport-legend">
+          <span id="legendTitle">রং: রেডশিফট</span>
+          <div id="legendBar" class="legend-bar"></div>
+          <div class="legend-labels mono">
+            <span id="legendMin">0</span>
+            <span id="legendMax">8</span>
+          </div>
+        </div>
+
+        <div class="distance-chip">
+          প্রদর্শনের দূরত্ব-সীমা
+          <strong id="distanceLimit" class="mono">—</strong>
+          <small>Comoving · Mpc</small>
+        </div>
+
+        <div id="loader" class="stage-message loading-message">
+          <span class="spinner" aria-hidden="true"></span>
+          <p id="loaderText">৩ডি ভিউ প্রস্তুত হচ্ছে…</p>
+        </div>
+
+        <div id="noResults" class="stage-message empty-message" hidden>
+          <h3>এই ফিল্টারে কোনো অবজেক্ট নেই</h3>
+          <p>রেডশিফট বা ভরের সীমা পরিবর্তন করুন।</p>
+          <button id="resetEmpty" class="primary-button">ফিল্টার রিসেট</button>
+        </div>
+      </section>
+
+      <section class="timeline" aria-label="রেডশিফট ফিল্টার">
+        <div class="timeline-heading">
+          <label for="zSlider">দূরত্ব / রেডশিফট কাট</label>
+          <strong class="mono">z ≤ <output id="zOutput">8.00</output></strong>
+        </div>
+
+        <input
+          id="zSlider"
+          type="range"
+          min="0.05"
+          max="8"
+          step="0.05"
+          value="8">
+
+        <p class="hint">
+          এটি দূরত্বের ফিল্টার, মহাজাগতিক সময় চালানোর বোতাম নয়।
+          দূরের বস্তুগুলোর আলো অতীতের আলাদা সময় থেকে আসে।
+        </p>
+      </section>
+    </main>
+
+    <!-- ডান প্যানেল -->
+    <aside id="rightPanel" class="panel inspector-panel" aria-label="অবজেক্ট ইনস্পেক্টর">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">INSPECTOR</span>
+          <h2>অবজেক্টের তথ্য</h2>
+        </div>
+        <button
+          class="icon-button drawer-close"
+          data-close-panels
+          aria-label="প্যানেল বন্ধ করুন">×</button>
+      </div>
+
+      <div id="emptyInspector" class="inspector-empty">
+        <span aria-hidden="true">◎</span>
+        <h3>একটি অবজেক্ট বাছুন</h3>
+        <p>
+          মানচিত্রে কোনো বিন্দুতে ক্লিক করুন,
+          অথবা উপরের অনুসন্ধানে একটি ডেমো ID লিখুন।
+        </p>
+        <code>DEMO-000125</code>
+      </div>
+
+      <div id="objectInspector" hidden>
+        <div class="object-heading">
+          <span class="badge warning">DEMO OBJECT</span>
+          <h3 id="objectId" class="mono">—</h3>
+        </div>
+
+        <p id="outsideFilter" class="notice" hidden>
+          এই অবজেক্টটি বর্তমান ফিল্টারের বাইরে আছে।
+        </p>
+
+        <dl class="metrics">
+          <div>
+            <dt>রেডশিফট · z</dt>
+            <dd id="zValue">—</dd>
+          </div>
+          <div>
+            <dt>Comoving দূরত্ব · χ</dt>
+            <dd id="chiValue">—</dd>
+          </div>
+          <div>
+            <dt>Lookback time</dt>
+            <dd id="lookbackValue">—</dd>
+          </div>
+          <div>
+            <dt>log₁₀(M★ / M☉)</dt>
+            <dd id="massValue">—</dd>
+          </div>
+          <div class="metric-wide">
+            <dt>নক্ষত্র গঠনের হার</dt>
+            <dd id="sfrValue">—</dd>
+          </div>
+          <div class="metric-wide">
+            <dt>স্থানাঙ্ক</dt>
+            <dd id="coordValue">—</dd>
+          </div>
+        </dl>
+
+        <section class="provenance-card">
+          <h3>উৎস ও সীমাবদ্ধতা</h3>
+          <ul>
+            <li>অবস্থান ও ভৌত ধর্ম: কৃত্রিম ডেমো।</li>
+            <li>দূরত্ব ও lookback: সরল মহাজাগতিক মডেল থেকে গণিত।</li>
+            <li>বাস্তব ক্যাটালগের সঙ্গে শনাক্তকরণ নেই।</li>
+            <li>পরিমাপজনিত অনিশ্চয়তার তথ্য নেই।</li>
+          </ul>
+        </section>
+
+        <div class="action-grid">
+          <button id="focusObject" class="primary-button">ফোকাস</button>
+          <button id="exportObject" class="wide-button">JSON এক্সপোর্ট</button>
+        </div>
+
+        <button id="whyObject" class="wide-button">
+          এই অবজেক্ট কীভাবে এসেছে?
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <span class="status-source"><i></i> স্থানীয় ডেমো</span>
+    <span>দেখানো: <strong id="visibleCount" class="mono">—</strong></span>
+    <span id="viewModeLabel">৩ডি আলোক-শঙ্কু</span>
+    <span class="fps">FPS: <strong id="fpsValue" class="mono">—</strong></span>
+    <button id="caveatButton">⚠ সীমাবদ্ধতা</button>
+  </footer>
+</div>
+
+<button
+  id="drawerBackdrop"
+  class="drawer-backdrop"
+  aria-label="খোলা প্যানেল বন্ধ করুন"
+  hidden></button>
+
+<dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+  <div class="dialog-heading">
+    <h2 id="helpTitle">আপনি কী দেখছেন?</h2>
+    <button id="closeHelp" class="icon-button" aria-label="সাহায্য বন্ধ করুন">×</button>
+  </div>
+
+  <p>
+    এটি মহাবিশ্ব-এক্সপ্লোরারের একটি UI প্রোটোটাইপ।
+    কোনো কণার গতিবিদ্যা বা গ্যালাক্সির প্রকৃত বিবর্তন এখানে চালানো হচ্ছে না।
+  </p>
+
+  <ul>
+    <li>সব DEMO অবজেক্ট কৃত্রিমভাবে তৈরি।</li>
+    <li>বিন্দুর আকার প্রকৃত গ্যালাক্সির ব্যাস নয়।</li>
+    <li>রং নির্বাচিত বৈশিষ্ট্য বোঝায়; প্রকৃত দৃশ্যমান রং নয়।</li>
+    <li>৩ডি ভিউ একটি জ্যামিতিক বিন্যাস; সরাসরি টেলিস্কোপের ছবি নয়।</li>
+    <li>আকাশচিত্র RA–Dec প্রক্ষেপণ; survey image নয়।</li>
+    <li>রেডশিফট স্লাইডার শুধু ফিল্টার করে, ইতিহাস বদলায় না।</li>
+    <li>Snapshot ডেটা ছাড়া কোনো বস্তুর “আজকের অবস্থা” দেখানো হয় না।</li>
+    <li>দেখানোর শেষ সীমা মহাবিশ্বের কোনো দেয়াল নয়।</li>
+  </ul>
+
+  <h3>কন্ট্রোল</h3>
+  <p>
+    ৩ডি: টেনে ঘোরান, স্ক্রলে জুম, ডান বোতামে প্যান।
+    আকাশচিত্র: টেনে প্যান ও স্ক্রলে জুম।
+  </p>
+  <p>
+    কীবোর্ড:
+    <kbd>/</kbd> অনুসন্ধান,
+    <kbd>R</kbd> ক্যামেরা রিসেট,
+    <kbd>F</kbd> নির্বাচিত বস্তুর দিকে ফোকাস।
+  </p>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<noscript>এই ইন্টারফেসের জন্য JavaScript চালু করতে হবে।</noscript>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

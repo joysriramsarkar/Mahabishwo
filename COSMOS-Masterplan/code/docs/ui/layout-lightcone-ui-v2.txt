@@ -1,0 +1,33 @@
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ [≡] Observable Universe Sim │ Frame: ◉Observed ○Comoving-now │ H0: 67.7▾ │ Run▾ │ ? │
+├─────────────┬──────────────────────────────────────────────────────┬─────────────┤
+│ LAYERS      │                                                      │ INSPECTOR   │
+│             │                                                      │ ──────────  │
+│ ▼ Matter    │                                                      │ Type: HALO  │
+│  ☑ Galaxies │                                                      │ z_obs 0.482 │
+│   ◦ by M★   │              3D LIGHT-CONE VIEWPORT                  │ χ 1,872 Mpc │
+│   ◦ by sSFR │       (WebGPU, log-depth, HEALPix-tiled LOD)         │   H0-range: │
+│   ◦ colour  │                                                      │   1,735–    │
+│  ☑ Halos    │                                                      │   1,872     │
+│  ☑ Cosmic   │                                                      │ log M 14.2  │
+│    web      │        ┌─── scale bar ────────────┐                  │ Y_SZ 3e-5   │
+│  ☑ Voids    │        │ 500 Mpc comoving         │                  │ tag:        │
+│ ▼ Radiation │        │ 338 Mpc proper @ z=0.48  │                  │  STATISTIC  │
+│  ☐ CMB T    │        └──────────────────────────┘                  │ ──────────  │
+│  ☐ CMB κ    │                                                      │ Provenance  │
+│  ☐ tSZ y    │                                                      │  shell S2   │
+│  ☐ CIB      │                                                      │  seed 1138  │
+│  ☐ 21 cm    │                                                      │  HOD v3.1   │
+│ ▼ Events    │                                                      │ [Merger tree]│
+│  ☐ GW srcs  │                                                      │ [Mock image▾]│
+│  ☐ Transient│                                                      │  JWST/Euclid│
+│ ▼ Reference │                                                      │  Rubin/SKA  │
+│  ☐ Survey   │                                                      │ [Why here?] │
+│    footprint│                                                      │             │
+│  ☐ Grid     │                                                      │             │
+├─────────────┴──────────────────────────────────────────────────────┴─────────────┤
+│ REDSHIFT  z: 0 ─●──────────────────────────────────── 1090 │ t_look 4.9 Gyr │▶⏸⏮│
+│ [BBN][Recomb][Dark Ages][Dawn][Reion][Noon][Λ-era][Today]   │ obs-time 2024.0 ▸│
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ STATUS: tiles 1,204 │ galaxies 3.1M │ 60 fps │ ensemble 7/64 │ ⚠ 3 caveats       │
+└──────────────────────────────────────────────────────────────────────────────────┘

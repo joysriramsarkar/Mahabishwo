@@ -1,0 +1,28 @@
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [≡] Observable Universe Sim  │ Frame: ◉Observed ○Comoving-now │ H0: 67.7▾ │ ?  │
+├────────────┬─────────────────────────────────────────────────┬───────────────┤
+│ LAYERS     │                                                 │ INSPECTOR     │
+│ ☑ Galaxies │                                                 │ ─────────────│
+│   ├ by M★  │                                                 │ Object: HALO  │
+│   ├ by sSFR│         3D LIGHT-CONE VIEWPORT                  │ z_obs 0.4821  │
+│   └ colour │   (WebGL/WebGPU, log-depth, HEALPix LOD)        │ χ 1,872 Mpc   │
+│ ☑ Halos    │                                                 │ ±H0: 1,735–   │
+│ ☑ Cosmic   │                                                 │      1,872    │
+│   web      │     ┌──── scale bar ─────┐                      │ log M 14.2    │
+│ ☑ Voids    │     │ 500 Mpc comoving    │                      │ Y_SZ ...      │
+│ ☐ CMB      │     └────────────────────┘                      │ tag:STATISTIC │
+│   ├ T      │                                                 │ ─────────────│
+│   ├ κ lens │                                                 │ Provenance:   │
+│   ├ y SZ   │                                                 │ shell S2,     │
+│ ☐ CIB/EBL  │                                                 │ seed 1138,    │
+│ ☐ 21cm     │                                                 │ HOD v3.1      │
+│ ☐ GW srcs  │                                                 │ [Open tree]   │
+│ ☐ Transient│                                                 │ [Mock image ▾]│
+│ ☐ Surveys  │                                                 │  JWST/Euclid/ │
+│   footprint│                                                 │  Rubin/SKA    │
+├────────────┴─────────────────────────────────────────────────┴───────────────┤
+│ TIME/REDSHIFT  z: 0 ──●──────────────────── 1090   │ t_look: 4.9 Gyr │ ▶ ⏸ ⏮   │
+│ [BBN][Recomb][Dark Ages][Dawn][Reion][Noon][Λ]     │ obs-time: 2024.0 +10yr ▸ │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ STATUS: tiles 1,204 │ galaxies 3.1M │ 60 fps │ ensemble 7/64 │ ⚠ 3 caveats   │
+└──────────────────────────────────────────────────────────────────────────────┘

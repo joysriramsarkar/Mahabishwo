@@ -1,0 +1,14 @@
+Universe (আয়তন অজানা, সম্ভবত অসীম)
+└─ L12 Observable Universe ··············· 93 Gly ব্যাস
+   └─ L11 Local Hole / KBC Void ·········· ~2 Gly (বিতর্কিত)
+      └─ L10 Pisces–Cetus Complex ········ ~1 Gly × 150 Mly
+         └─ L9 Laniakea Supercluster ····· 520 Mly, 10¹⁷ M☉
+            └─ L8 Virgo Supercluster ····· 110–147 Mly, ~10¹⁵ M☉
+               └─ L7 Local Volume ········ ব্যাসার্ধ 11 Mpc (36 Mly)
+                  └─ L6 Local Sheet ······ ~34 Mly × 1.5 Mly
+                     └─ L5 Local Group ··· ~10 Mly, 2×10¹² M☉
+                        └─ L4 MW subgroup · হ্যালো ~1.9 Mly
+                           └─ L3 আকাশগঙ্গা · D25 = 87,400 ly
+                              └─ L2 Orion Arm / Local Bubble
+                                 └─ L1 Radcliffe Wave · 9,000 ly
+                                    └─ L0 সৌরজগৎ → পৃথিবী

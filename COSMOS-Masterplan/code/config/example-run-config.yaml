@@ -1,0 +1,76 @@
+
+schema_version: 1
+
+run:
+  id: lcdm-ensemble-0042
+  mode: hybrid
+  description: "Extragalactic statistical universe with selected zooms"
+
+cosmology:
+  model: FlatLambdaCDM
+  parameter_set: Planck18
+  include_radiation: true
+  include_massive_neutrinos: true
+
+initial_conditions:
+  redshift_start: 127.0
+  transfer_function: CLASS
+  displacement_order: 2LPT
+  random_seed: 918273
+  constrained_local_volume: false
+
+base_volume:
+  periodic: true
+  box_length_mpc_per_h: 2000.0
+  components:
+    - cold_dark_matter
+    - baryons
+  gravity:
+    method: TreePM
+  hydrodynamics:
+    enabled: true
+
+subgrid:
+  star_formation: density_temperature_jeans
+  stellar_feedback: momentum_and_energy
+  black_hole_accretion: configurable
+  agn_feedback: configurable
+  radiative_cooling: metal_dependent
+
+zooms:
+  selection:
+    - massive_clusters
+    - filament_intersections
+    - representative_galaxies
+  boundary_buffer: true
+  contamination_check: true
+
+lightcone:
+  observer_frame: CMB_rest_approximation
+  z_max: 20.0
+  output_coordinates: ICRS
+  include_peculiar_velocities: true
+  include_weak_lensing: true
+  avoid_box_repetition: true
+
+outputs:
+  snapshot_strategy: logarithmic_in_scale_factor
+  catalogs:
+    - halos
+    - galaxies
+    - merger_trees
+  maps:
+    - dark_matter_density
+    - gas_density
+    - gas_temperature
+    - electron_pressure
+  formats:
+    raw: HDF5
+    fields: Zarr
+    catalogs: Parquet
+
+validation:
+  convergence_runs: true
+  random_seed_variants: 4
+  store_provenance: true
+  separate_calibration_and_validation: true

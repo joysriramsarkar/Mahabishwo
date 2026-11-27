@@ -1,0 +1,61 @@
+cosmos/
+│
+├── docs/
+│   ├── scientific-foundation/
+│   ├── physics/
+│   ├── cosmology/
+│   └── architecture/
+│
+├── knowledge/
+│   ├── theories/
+│   ├── equations/
+│   ├── constants/
+│   ├── particles/
+│   └── uncertainty/
+│
+├── datasets/
+│   ├── astronomy/
+│   ├── cosmology/
+│   ├── planetary/
+│   └── reference/
+│
+├── engines/
+│   ├── cosmology/
+│   ├── gravity/
+│   ├── particles/
+│   ├── astrophysics/
+│   ├── stellar/
+│   ├── planetary/
+│   ├── chemistry/
+│   └── biology/
+│
+├── solvers/
+│   ├── nbody/
+│   ├── hydrodynamics/
+│   ├── quantum/
+│   ├── relativity/
+│   └── radiation/
+│
+├── integrations/
+│   ├── class/
+│   ├── camb/
+│   ├── gadget/
+│   ├── arepo/
+│   └── observatories/
+│
+├── validation/
+│   ├── unit-tests/
+│   ├── physics-tests/
+│   └── observational-tests/
+│
+├── renderer/
+│   ├── universe/
+│   ├── galaxies/
+│   ├── planetary/
+│   └── visualization/
+│
+├── api/
+├── experiments/
+├── benchmarks/
+├── tools/
+└── README.md

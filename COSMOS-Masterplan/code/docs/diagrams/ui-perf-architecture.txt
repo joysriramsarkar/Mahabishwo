@@ -1,0 +1,7 @@
+Browser (WebGPU)  ◄── Arrow IPC streams ──  Tile server (FastAPI + DuckDB/Parquet)
+   │ LOD: nside 16→256 শেল; বড় দূরত্বে point-density impostor
+   │ GPU-side culling by (hpix, chi)
+   │ Web Worker: Arrow decode, frame-conversion
+   └── CMB sphere: cubemap from HEALPix (nside 8192 → 6×4096² tiles, mip-mapped)
+Analysis service (Dask/Ray cluster): P(k), ξ(r), mass function, mock imaging (SKIRT/GalSim)
+Ensemble store: ১০³ realizations-এর summary statistics (emulator-দ্রুত) + ~৬৪ পূর্ণ cones

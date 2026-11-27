@@ -1,0 +1,11 @@
+
+GET  /v1/runs
+GET  /v1/runs/{run_id}/snapshots
+GET  /v1/lightcone/tiles/{level}/{tile_id}
+GET  /v1/objects/{object_id}
+GET  /v1/objects/{object_id}/merger-tree
+GET  /v1/objects/{object_id}/spectrum
+GET  /v1/maps/{map_type}/{healpix_tile}
+POST /v1/jobs/mock-observation
+GET  /v1/jobs/{job_id}
+GET  /v1/provenance/{run_id}

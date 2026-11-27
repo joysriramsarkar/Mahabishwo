@@ -1,0 +1,10 @@
+lightcone/
+  galaxies/   nside=256 (786k tiles) × z-bins (Δχ=50 Mpc) → Parquet/HDF5 chunks
+  halos/
+  transients/ time-ordered, HEALPix nside=64
+  cmb/        HEALPix nside=8192 maps: T,Q,U,κ,y_SZ,ISW,CIB(5 bands)
+  21cm/       lightcone cube: (nside=1024) × freq (50–200 MHz, Δν=0.1 MHz)
+  fields/     δ_m, v_bulk on (nside=512) × z shells  → UI volume rendering
+volume/
+  snapshots/  (খুব কম: z = 0, 0.5, 1, 2, 3, 5, 7, 10, 20)
+  trees/

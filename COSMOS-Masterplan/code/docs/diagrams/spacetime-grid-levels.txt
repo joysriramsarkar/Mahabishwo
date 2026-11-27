@@ -1,0 +1,8 @@
+Level 0: Planck-scale causal set / spin network
+Level 1: Lattice QFT (a ~ 1 fm)
+Level 2: Nuclear scale (a ~ 10 fm)
+Level 3: Atomic/molecular (a ~ 1 Å)
+Level 4: Mesoscopic (a ~ 1 μm - 1 mm)
+Level 5: Macroscopic / fluid (a ~ 1 m - 1 km)
+Level 6: Astronomical (a ~ 1 AU - 1 Mpc)
+Level 7: Cosmological (a ~ 1 Gpc)

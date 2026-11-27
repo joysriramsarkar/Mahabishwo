@@ -1,0 +1,11 @@
+সিমুলেশন state
+  ↓
+Stellar population synthesis (BPASS / FSPS)
+  ↓
+Dust radiative transfer (SKIRT / POWDERDAY, Monte Carlo)
+  ↓
+Instrument response (Gaia / JWST / HST / Euclid PSF, noise, selection)
+  ↓
+Mock catalog
+  ↓
+পর্যবেক্ষিত catalog-এর সঙ্গে একই বিশ্লেষণ-পাইপলাইন

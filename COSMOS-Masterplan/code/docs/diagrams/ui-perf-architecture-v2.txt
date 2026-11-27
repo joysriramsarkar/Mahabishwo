@@ -1,0 +1,12 @@
+Browser (WebGPU)
+ ├─ HEALPix-tiled LOD: nside 16 → 256 (দূরত্ব অনুযায়ী)
+ ├─ GPU-side culling by (hpix, χ) range
+ ├─ Point budget ~৫–১০ M / frame (desktop); অতিরিক্ত হলে density impostor
+ ├─ z > 1: গ্যালাক্সি-বিন্দুর বদলে δ-field volume render + উজ্জ্বলতম বস্তু
+ ├─ CMB: HEALPix 8192 → cubemap 6×4096², mip-mapped
+ ├─ Web Worker: Arrow decode, frame-conversion, নির্বাচন-পরিসংখ্যান
+ └─ Origin-rebasing (camera-relative float32)
+         │ Arrow IPC streams
+Tile server (FastAPI + DuckDB/Parquet) — (hpix, z-bin) index, O(1) tile lookup
+Analysis service (Dask/Ray) — P(k), ξ(r), C_ℓ, mock imaging (GalSim/SKIRT)
+Ensemble store — ১০³ realizations-এর summary stats (emulator-দ্রুত) + ~৬৪ পূর্ণ cones

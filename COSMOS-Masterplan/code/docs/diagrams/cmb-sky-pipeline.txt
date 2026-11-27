@@ -1,0 +1,9 @@
+C_ℓ (unlensed)  ──► Gaussian a_ℓm ──► HEALPix map (N_side=8192, ℓ_max≈16000)
+                                           │
+foreground LSS (S2–S5) ──► lensing potential φ ──► remap (LensPix/lenspyx)
+                                           │
+tSZ (ICM থেকে), kSZ (bulk velocity), ISW (dΦ/dt), CIB, radio sources ──► যোগ
+                                           │
+Galactic foreground (synchrotron, dust, free-free) [আকাশগঙ্গা-মার্কার থেকে] ──► যোগ
+                                           │
+Instrument beam + noise ──► mock Planck / SO / CMB-S4

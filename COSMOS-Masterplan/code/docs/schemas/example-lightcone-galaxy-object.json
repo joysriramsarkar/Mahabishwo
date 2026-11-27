@@ -1,0 +1,36 @@
+
+{
+  "id": "sim01:lightcone:galaxy:00091827",
+  "origin": "SIMULATED",
+  "run_id": "lcdm-ensemble-0042",
+  "snapshot_id": "a_0.8231",
+  "coordinates": {
+    "frame": "ICRS",
+    "ra_deg": 153.2841,
+    "dec_deg": -21.4418,
+    "redshift_cosmological": 0.2142,
+    "redshift_observed": 0.2145
+  },
+  "masses": {
+    "halo": {
+      "definition": "M200c",
+      "value_msun": 7.2e12
+    },
+    "stellar_msun": 4.8e10,
+    "gas_msun": 1.1e11
+  },
+  "properties": {
+    "star_formation_rate_msun_per_year": 3.7,
+    "gas_metallicity_solar": 0.63,
+    "morphology": "disk-dominated"
+  },
+  "uncertainty": {
+    "ensemble_stellar_mass_dex": 0.18,
+    "classification": "model-dependent"
+  },
+  "provenance": {
+    "code_commit": "SIM_ENGINE_GIT_HASH",
+    "initial_conditions_hash": "IC_SHA256",
+    "lightcone_builder_version": "1.0"
+  }
+}

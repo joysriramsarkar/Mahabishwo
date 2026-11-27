@@ -1,0 +1,61 @@
+COSMOS/
+│
+├── documentation/
+│
+├── scientific-knowledge/
+│   ├── physics/
+│   ├── cosmology/
+│   ├── astronomy/
+│   ├── theories/
+│   ├── equations/
+│   └── constants/
+│
+├── data/
+│   ├── milky-way/
+│   ├── local-group/
+│   ├── local-sheet/
+│   ├── virgo/
+│   ├── laniakea/
+│   ├── superclusters/
+│   └── cosmic-web/
+│
+├── catalogues/
+│   ├── stars/
+│   ├── galaxies/
+│   ├── clusters/
+│   ├── voids/
+│   └── filaments/
+│
+├── engines/
+│   ├── galaxy/
+│   ├── stellar/
+│   ├── gravity/
+│   ├── dark-matter/
+│   ├── gas/
+│   ├── black-hole/
+│   ├── cosmology/
+│   └── cosmic-flow/
+│
+├── solvers/
+│   ├── nbody/
+│   ├── hydrodynamics/
+│   ├── mhd/
+│   └── relativity/
+│
+├── simulation/
+│   ├── orchestrator/
+│   ├── multiscale/
+│   ├── timeline/
+│   └── scenarios/
+│
+├── visualization/
+│   ├── galaxy-explorer/
+│   ├── local-group/
+│   ├── supercluster-explorer/
+│   └── cosmic-web/
+│
+├── database/
+├── api/
+├── validation/
+├── benchmarks/
+└── tests/

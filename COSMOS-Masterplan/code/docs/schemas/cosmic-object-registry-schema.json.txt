@@ -1,0 +1,52 @@
+{
+  "id": "galaxy_milky_way",
+  "name": "Milky Way",
+  "object_type": "barred_spiral_galaxy",
+
+  "classification": {
+    "morphology": "SB(rs)bc",
+    "status": "observed"
+  },
+
+  "position": {
+    "coordinate_system": "galactic",
+    "reference_frame": "ICRS",
+    "epoch": "J2000"
+  },
+
+  "distance": {
+    "reference_object": "Sun",
+    "value": 8.2,
+    "unit": "kpc",
+    "uncertainty": null
+  },
+
+  "physical_properties": {
+    "stellar_mass": {
+      "value": 5e10,
+      "unit": "solar_mass"
+    },
+    "halo_mass": {
+      "value": 1.08e12,
+      "unit": "solar_mass"
+    }
+  },
+
+  "components": [
+    "galactic_bar",
+    "thin_disk",
+    "thick_disk",
+    "stellar_halo",
+    "dark_matter_halo",
+    "spiral_arms"
+  ],
+
+  "catalogues": [
+    "SIMBAD",
+    "Gaia"
+  ],
+
+  "sources": [],
+  "uncertainties": [],
+  "version": "1.0"
+}

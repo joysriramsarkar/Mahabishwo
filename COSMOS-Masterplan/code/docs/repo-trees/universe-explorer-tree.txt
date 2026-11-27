@@ -1,0 +1,66 @@
+universe-explorer/
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+├── tailwind.config.ts
+├── postcss.config.js
+├── index.html
+└── src/
+    ├── main.tsx
+    ├── App.tsx
+    ├── styles/
+    │   ├── tokens.css
+    │   ├── base.css
+    │   └── utilities.css
+    ├── types/
+    │   ├── cosmos.ts
+    │   └── api.ts
+    ├── state/
+    │   ├── explorer.ts
+    │   └── selectors.ts
+    ├── data/
+    │   ├── queries.ts
+    │   ├── mock.ts
+    │   └── layers.ts
+    ├── components/
+    │   ├── layout/
+    │   │   ├── AppShell.tsx
+    │   │   ├── TopBar.tsx
+    │   │   ├── NavRail.tsx
+    │   │   ├── Panels.tsx
+    │   │   └── StatusBar.tsx
+    │   ├── viewport/
+    │   │   ├── Viewport.tsx
+    │   │   ├── Viewport3D.tsx
+    │   │   ├── ViewportSky.tsx
+    │   │   ├── ViewportSlice.tsx
+    │   │   ├── SceneSetup.tsx
+    │   │   └── layers/
+    │   │       ├── GalaxyLayer.tsx
+    │   │       ├── ClusterLayer.tsx
+    │   │       ├── FilamentLayer.tsx
+    │   │       ├── VoidLayer.tsx
+    │   │       └── CMBSphere.tsx
+    │   ├── panels/
+    │   │   ├── LayerPanel.tsx
+    │   │   ├── InfoPanel.tsx
+    │   │   ├── TimeController.tsx
+    │   │   └── SearchPanel.tsx
+    │   ├── ui/
+    │   │   ├── Badge.tsx
+    │   │   ├── Button.tsx
+    │   │   ├── Chip.tsx
+    │   │   ├── Slider.tsx
+    │   │   ├── Switch.tsx
+    │   │   ├── Tooltip.tsx
+    │   │   └── UncertaintyMark.tsx
+    │   └── compare/
+    │       └── CompareView.tsx
+    ├── hooks/
+    │   ├── useKeyboard.ts
+    │   ├── useRaycast.ts
+    │   └── useReducedMotion.ts
+    └── lib/
+        ├── scales.ts
+        ├── format.ts
+        └── accessibility.ts

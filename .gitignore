@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+*.tsbuildinfo
+__pycache__/
 
 # Logs
 *.log

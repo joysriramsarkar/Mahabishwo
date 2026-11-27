@@ -1,0 +1,5 @@
+MPI rank (node-level)
+  └── Peano-Hilbert curve segment
+       └── OpenMP thread (socket)
+            └── GPU kernel (SIMT)
+                 └── SIMD lane (AVX-512 / SVE)

@@ -1,0 +1,7 @@
+L1 (periodic, full box)
+ │  → tidal tensor T_ij(t) প্রতি অঞ্চলে সংরক্ষিত
+ ▼
+L2 (zoom region, buffer = 3×R_zoom)
+ │  → mass flux across boundary + tidal field
+ ▼
+L3 ... L7

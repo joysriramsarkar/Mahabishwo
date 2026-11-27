@@ -1,0 +1,34 @@
+
+        পর্যবেক্ষণ ডেটা ও মহাজাগতিক পরামিতি
+                         │
+                         ▼
+        Initial Conditions / Constrained Realizations
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+     বড় Periodic Boxes       কাছের অঞ্চলের Constraint
+             │                       │
+             └───────────┬───────────┘
+                         ▼
+           Gravity + Hydro + Feedback Engine
+                         │
+             ┌───────────┴──────────────┐
+             ▼                          ▼
+       Snapshots/Merger Trees      Cluster/Galaxy Zooms
+             │                          │
+             └───────────┬──────────────┘
+                         ▼
+                  Light-Cone Builder
+                         │
+                         ▼
+             Mock Observation / Forward Model
+                         │
+          ┌──────────────┼────────────────┐
+          ▼              ▼                ▼
+      3D Tiles       Sky Maps          Catalogs/Spectra
+          └──────────────┼────────────────┘
+                         ▼
+                  Scientific Data API
+                         │
+                         ▼
+                 Web/Desktop Universe UI
