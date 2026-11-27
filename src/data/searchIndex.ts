@@ -80,6 +80,16 @@ export class SearchEngine {
       });
     });
 
+    this.items.push({
+      id: 'galaxy_collision',
+      name: 'Milky Way & Andromeda Collision (ONNX WebGPU)',
+      nameBn: 'আকাশগঙ্গা ও অ্যান্ড্রোমিডা সংঘর্ষ (AI ফিজিক্স)',
+      category: 'N-Body Simulation',
+      categoryBn: 'গ্যালাক্সি সংঘর্ষ',
+      scaleLevel: ScaleLevel.GALAXY_CLUSTER,
+      color: '#e879f9',
+    });
+
     Object.values(STAR_SYSTEMS_CATALOG).forEach((sys) => {
       this.items.push({
         id: sys.id,

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { AppState, SceneLayer } from '../../core/types';
 import { SUPERCLUSTERS } from '../../data/cosmicData';
 import { CMB_VERTEX, CMB_FRAGMENT } from '../../render/shaders';
-import { buildStarData, createStarPoints, createAtmosphere } from '../helpers';
+import { buildStarData, createStarPoints, createAtmosphere, createGlowSprite } from '../helpers';
 import { mulberry32, densityBrightness, densityPointScale } from '../../utils/math';
 import { buildSuperclusterClouds, type SuperclusterGlow, getSuperclusterMemberNodes } from '../superclusters';
 
@@ -35,6 +35,7 @@ export class ObservableUniverseLayer implements SceneLayer {
   private superclusterGroup = new THREE.Group();
   private superclusterMaterial: THREE.ShaderMaterial | null = null;
   private superclusterGlows: SuperclusterGlow[] = [];
+  private darkMatterGroup = new THREE.Group();
 
   constructor() {
     // --- Large-scale-structure sphere ---
@@ -161,6 +162,26 @@ export class ObservableUniverseLayer implements SceneLayer {
       }
     }
     this.group.add(this.filamentGroup);
+
+    // --- Dark Matter halos & Dark Energy boundary shell ---
+    SUPERCLUSTERS.filter((sc) => sc.id !== 'bootes_void').forEach((sc) => {
+      const dmSprite = createGlowSprite('#818cf8', 34 + sc.radiusMly * 0.16, 0.28, '#a855f7');
+      dmSprite.position.set(...sc.position);
+      this.darkMatterGroup.add(dmSprite);
+    });
+    const deShell = new THREE.Mesh(
+      new THREE.SphereGeometry(SPHERE_RADIUS * 0.96, 36, 24),
+      new THREE.MeshBasicMaterial({
+        color: '#6366f1',
+        wireframe: true,
+        transparent: true,
+        opacity: 0.055,
+        depthWrite: false,
+      })
+    );
+    this.darkMatterGroup.add(deShell);
+    this.darkMatterGroup.visible = false;
+    this.group.add(this.darkMatterGroup);
   }
 
   public build(): void {
@@ -169,27 +190,53 @@ export class ObservableUniverseLayer implements SceneLayer {
 
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
+
+    // Cosmological timeline feedback (0 Gyr Big Bang/CMB -> 13.8 Gyr expanded web)
+    const ageNorm = THREE.MathUtils.clamp(state.cosmicAge / 13.8, 0, 1);
+    const scaleFactor = 0.42 + 0.58 * Math.pow(Math.max(0.02, ageNorm), 0.62);
+    const structureMaturity = THREE.MathUtils.smoothstep(state.cosmicAge, 0.12, 2.4);
+    const cmbEpochBoost =
+      state.cosmicAge < 0.05
+        ? 1.9
+        : state.cosmicAge < 0.6
+          ? 1.45
+          : 0.92 + (1 - ageNorm) * 0.35;
+
     this.cmbMaterial.uniforms.uTime.value += dt;
+    this.cmbMaterial.uniforms.uBrightness.value = 0.85 * cmbEpochBoost;
     this.cmbMesh.visible = state.layers.cmb;
-    this.superclusterGroup.visible = state.layers.cosmicWeb;
+
+    this.superclusterGroup.visible = state.layers.cosmicWeb && structureMaturity > 0.02;
+    this.superclusterGroup.scale.setScalar(scaleFactor);
+    this.filamentGroup.scale.setScalar(scaleFactor);
+    this.galaxyPoints.scale.setScalar(scaleFactor);
+    this.galaxyPoints.visible = state.layers.stars && structureMaturity > 0.02;
+    this.darkMatterGroup.visible = state.layers.darkMatter && structureMaturity > 0.05;
+    this.darkMatterGroup.scale.setScalar(scaleFactor);
 
     this.starMaterial.uniforms.uTime.value = state.elapsedTime;
     this.starMaterial.uniforms.uScale.value =
       0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(state.density);
-    this.starMaterial.uniforms.uBrightness.value = densityBrightness(state.density);
+    this.starMaterial.uniforms.uBrightness.value =
+      densityBrightness(state.density) * (0.15 + 0.85 * structureMaturity);
 
     if (this.superclusterMaterial) {
       this.superclusterMaterial.uniforms.uTime.value = state.elapsedTime;
       this.superclusterMaterial.uniforms.uScale.value =
         0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(state.density);
-      this.superclusterMaterial.uniforms.uBrightness.value = densityBrightness(state.density) * 1.5;
+      this.superclusterMaterial.uniforms.uBrightness.value =
+        densityBrightness(state.density) * 1.5 * structureMaturity;
     }
     const pulse = 1 + Math.sin(state.elapsedTime * 0.85) * 0.05;
     this.superclusterGlows.forEach((entry) => {
-      entry.sprite.scale.set(entry.baseSize * pulse, entry.baseSize * pulse, 1);
+      entry.sprite.scale.set(
+        entry.baseSize * pulse * Math.max(0.2, structureMaturity),
+        entry.baseSize * pulse * Math.max(0.2, structureMaturity),
+        1
+      );
     });
 
-    this.filamentGroup.visible = state.layers.cosmicWeb;
+    this.filamentGroup.visible = state.layers.cosmicWeb && structureMaturity > 0.04;
     this.group.rotation.y += dt * 0.004 * Math.min(state.rotationSpeed, 6);
   }
 

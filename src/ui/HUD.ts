@@ -6,7 +6,7 @@
 import { AppState, ScaleLevel, SCALE_CONFIGS } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
-import { STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
+import { STAR_SYSTEMS_CATALOG, GALAXIES } from '../data/cosmicData';
 import { toBn } from '../utils/math';
 
 export class HUD {
@@ -78,6 +78,14 @@ export class HUD {
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition flex items-center gap-1">
           <span aria-hidden="true">🔍</span><span class="hidden lg:inline">খুঁজুন</span>
         </button>
+        <button id="btn-compare" type="button" title="দুটি বস্তু তুলনা করুন (C)" aria-label="তুলনা মোড" aria-haspopup="dialog"
+          class="hud-btn hidden sm:flex px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition items-center gap-1">
+          <span aria-hidden="true">⚖️</span><span class="hidden lg:inline">তুলনা</span>
+        </button>
+        <button id="btn-scale-viz" type="button" title="লগারিদমিক স্কেল ভিজুয়ালাইজার (V)" aria-label="স্কেল ভিজুয়ালাইজার" aria-haspopup="dialog"
+          class="hud-btn hidden sm:flex px-2 py-1.5 rounded-xl text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition items-center gap-1">
+          <span aria-hidden="true">📏</span>
+        </button>
         <button id="btn-tour" type="button" title="গাইডেড ট্যুর" aria-label="গাইডেড ট্যুর শুরু করুন"
           class="hud-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-amber-100 hover:text-white hover:bg-amber-500/20 transition flex items-center gap-1">
           <span aria-hidden="true">🎬</span><span class="hidden lg:inline">ট্যুর</span>
@@ -132,7 +140,8 @@ export class HUD {
     });
 
     document.getElementById('crumb-galaxy')?.addEventListener('click', () => {
-      this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
+      const galaxyId = this.state.activeGalaxyId || 'milkyway';
+      this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId });
       this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
     });
 
@@ -170,26 +179,46 @@ export class HUD {
     const cPlan = document.getElementById('crumb-planet');
 
     const cfg = SCALE_CONFIGS[this.state.currentScale];
+    const activeGal =
+      !this.state.collisionMode && this.state.currentScale === ScaleLevel.GALAXY
+        ? GALAXIES.find((g) => g.id === (this.state.activeGalaxyId || 'milkyway'))
+        : undefined;
     if (badge) {
-      badge.textContent = cfg.nameBn;
+      badge.textContent = this.state.collisionMode
+        ? 'গ্যালাক্সি সংঘর্ষ (ONNX AI)'
+        : activeGal
+          ? activeGal.nameBn
+          : cfg.nameBn;
       badge.classList.remove('scale-flash');
       void badge.offsetWidth;
       badge.classList.add('scale-flash');
     }
-    if (readout) readout.textContent = cfg.readoutBn;
+    if (readout) {
+      readout.textContent = this.state.collisionMode
+        ? '~২.৫ লক্ষ আলোকবর্ষ • Leapfrog + MLP'
+        : activeGal
+          ? `~${toBn(activeGal.diameterKly)},০০০ আলোকবর্ষ`
+          : cfg.readoutBn;
+    }
     if (ageEl) ageEl.textContent = toBn(this.state.cosmicAge.toFixed(1));
 
     const srStatus = document.getElementById('sr-status');
     if (srStatus) {
-      srStatus.textContent = `বর্তমান স্কেল: ${cfg.nameBn}। ${cfg.readoutBn}।`;
+      srStatus.textContent = this.state.collisionMode
+        ? 'বর্তমান দৃশ্য: আকাশগঙ্গা ও অ্যান্ড্রোমিডা গ্যালাক্সি সংঘর্ষ সিমুলেশন।'
+        : `বর্তমান স্কেল: ${cfg.nameBn}। ${cfg.readoutBn}।`;
     }
 
-    const showGal = this.state.currentScale >= ScaleLevel.GALAXY;
-    const showSys = this.state.currentScale >= ScaleLevel.STAR_SYSTEM;
-    const showPlan = this.state.currentScale >= ScaleLevel.PLANET;
+    const showGal = !this.state.collisionMode && this.state.currentScale >= ScaleLevel.GALAXY;
+    const showSys = !this.state.collisionMode && this.state.currentScale >= ScaleLevel.STAR_SYSTEM;
+    const showPlan = !this.state.collisionMode && this.state.currentScale >= ScaleLevel.PLANET;
 
     sep1?.classList.toggle('hidden', !showGal);
     cGal?.classList.toggle('hidden', !showGal);
+    if (showGal && cGal) {
+      const gal = GALAXIES.find((g) => g.id === (this.state.activeGalaxyId || 'milkyway'));
+      cGal.textContent = gal ? gal.nameBn.replace(/\s*ছায়াপথ.*/, '') : 'আকাশগঙ্গা';
+    }
 
     sep2?.classList.toggle('hidden', !showSys);
     cSys?.classList.toggle('hidden', !showSys);

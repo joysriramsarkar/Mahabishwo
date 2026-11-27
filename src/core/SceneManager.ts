@@ -9,13 +9,14 @@
  */
 import * as THREE from 'three';
 import { Engine } from './Engine';
-import { AppState, ScaleLevel, PlanetData } from './types';
+import { AppState, CollisionPreset, ScaleLevel, PlanetData } from './types';
 import { eventBus } from './EventBus';
 import { CameraController } from './CameraController';
 import { ObservableUniverseLayer } from '../universe/layers/ObservableUniverseLayer';
 import { CosmicWebLayer } from '../universe/layers/CosmicWebLayer';
 import { LocalGroupLayer } from '../universe/layers/LocalGroupLayer';
 import { GalaxyLayer, SOLAR_GALACTIC_POS } from '../universe/layers/GalaxyLayer';
+import { GalaxyCollisionLayer } from '../universe/layers/GalaxyCollisionLayer';
 import { StarSystemLayer } from '../universe/layers/StarSystemLayer';
 import { PlanetLayer } from '../universe/layers/PlanetLayer';
 import { buildStarData, createStarPoints, updateNightTerminators, updateSunDirections } from '../universe/helpers';
@@ -61,6 +62,7 @@ export class SceneManager {
   public cosmicWeb: CosmicWebLayer;
   public localGroup: LocalGroupLayer;
   public galaxy: GalaxyLayer;
+  public galaxyCollision: GalaxyCollisionLayer;
   public starSystem: StarSystemLayer;
   public planet: PlanetLayer;
 
@@ -91,6 +93,7 @@ export class SceneManager {
     this.cosmicWeb = new CosmicWebLayer();
     this.localGroup = new LocalGroupLayer();
     this.galaxy = new GalaxyLayer(engine.camera);
+    this.galaxyCollision = new GalaxyCollisionLayer();
     this.starSystem = new StarSystemLayer(engine.camera);
     this.planet = new PlanetLayer();
   }
@@ -114,6 +117,8 @@ export class SceneManager {
       this.planet,
     ];
     layers.forEach((l) => this.engine.scene.add(l.group));
+    this.galaxyCollision.group.visible = false;
+    this.engine.scene.add(this.galaxyCollision.group);
 
     onProgress?.(80, 'গ্রহ ও ছায়াপথ প্রস্তুত হচ্ছে...');
     const earth = STAR_SYSTEMS_CATALOG.solar.planets.find((p) => p.id === 'earth');
@@ -227,6 +232,40 @@ export class SceneManager {
   // Continuous blending with context-aware portal gating
   // ----------------------------------------------------------------
   private updateContinuousZoom(dt: number): void {
+    if (this.state.collisionMode) {
+      this.slots.forEach((slot) => {
+        slot.layer.visible = false;
+        slot.layer.group.visible = false;
+      });
+      this.galaxyCollision.visible = true;
+      this.galaxyCollision.group.visible = true;
+      this.galaxyCollision.update(dt, this.state);
+      this.state.cameraMinRadius = 6.0;
+
+      if (this.backgroundMat) {
+        const density = this.state.density;
+        this.backgroundMat.uniforms.uTime.value = this.state.elapsedTime;
+        this.backgroundMat.uniforms.uScale.value =
+          0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) * densityPointScale(density);
+        if (this.backgroundMat.uniforms.uBrightness) {
+          this.backgroundMat.uniforms.uBrightness.value = densityBrightness(density);
+        }
+        if (this.backgroundMat.uniforms.uOpacity) {
+          this.backgroundMat.uniforms.uOpacity.value = 0.88;
+        }
+        if (this.backgroundStars) this.backgroundStars.visible = this.state.layers.stars;
+      }
+      if (this.galaxySkyMat && this.galaxySkyMesh) {
+        this.galaxySkyMat.uniforms.uOpacity.value = 0.35;
+        this.galaxySkyMesh.visible = this.state.layers.stars;
+      }
+      this.engine.scene.fog = null;
+      return;
+    }
+
+    this.galaxyCollision.visible = false;
+    this.galaxyCollision.group.visible = false;
+
     const t = clamp(this.state.zoomLevel, 0, 6);
     const isTransitioning = this.cameraCtrl?.getIsTransitioning() ?? false;
     const target = this.cameraCtrl?.coords.desiredTarget;
@@ -249,7 +288,7 @@ export class SceneManager {
         if (this.enteredLocalGroup && !this.enteredMilkyWay && t >= 2.2 && target.length() < 10) {
           this.enteredMilkyWay = true;
         }
-        if (this.enteredMilkyWay && !this.enteredStarSystem && t >= 3.2) {
+        if (this.enteredMilkyWay && !this.enteredStarSystem && t >= 3.2 && this.state.activeGalaxyId === 'milkyway') {
           this.getChildAnchor(3, this.anchorTmp);
           if (target.distanceTo(this.anchorTmp) < 12) {
             this.enteredStarSystem = true;
@@ -299,12 +338,12 @@ export class SceneManager {
     const effectiveMaxScale = !this.enteredLocalGroup
       ? 1
       : !this.enteredMilkyWay
-      ? 2
-      : !this.enteredStarSystem
-      ? 3
-      : !this.enteredPlanet
-      ? 4
-      : 6;
+        ? 2
+        : !this.enteredStarSystem
+          ? 3
+          : !this.enteredPlanet
+            ? 4
+            : 6;
     const tEff = Math.min(t, effectiveMaxScale);
 
     // StarSystemLayer stays at world origin, so no galactic-anchor recentering is
@@ -566,18 +605,35 @@ export class SceneManager {
       preserveSelection?: boolean;
     } = {}
   ): void {
+    this.state.collisionMode = false;
+    this.galaxyCollision.visible = false;
+    this.galaxyCollision.group.visible = false;
+
     // No instant visibility toggle anymore — the continuous zoom blends.
     // This method only prepares data (which system / planet is active).
     if (!options.preserveSelection) {
       this.state.activeSuperclusterId = null;
       this.state.activeMemberClusterId = null;
     }
-    if (options.galaxyId) this.state.activeGalaxyId = options.galaxyId;
+    let rebuilt = false;
+    if (options.galaxyId) {
+      this.state.activeGalaxyId = options.galaxyId;
+      if (this.galaxy.activeGalaxyId !== options.galaxyId) {
+        this.galaxy.build({ galaxyId: options.galaxyId });
+        rebuilt = true;
+      }
+    }
     if (options.clusterId) this.state.activeClusterId = options.clusterId;
 
-    let rebuilt = false;
     if (options.systemId) {
       this.state.activeSystemId = options.systemId;
+      if (!options.galaxyId && this.state.activeGalaxyId !== 'milkyway') {
+        this.state.activeGalaxyId = 'milkyway';
+        if (this.galaxy.activeGalaxyId !== 'milkyway') {
+          this.galaxy.build({ galaxyId: 'milkyway' });
+          rebuilt = true;
+        }
+      }
       if (this.starSystem.activeSystemId !== options.systemId) {
         this.starSystem.build({ systemId: options.systemId });
         rebuilt = true;
@@ -677,6 +733,42 @@ export class SceneManager {
     );
   }
 
+  /** Enter the interactive ONNX Neural Gravity Milky Way + Andromeda collision mode. */
+  public enterCollisionMode(preset?: CollisionPreset, rebuild = false): void {
+    const nextPreset = preset ?? this.state.collisionPreset;
+    const presetChanged = nextPreset !== this.state.collisionPreset;
+    this.state.collisionPreset = nextPreset;
+    this.state.collisionMode = true;
+    this.state.activePreset = 'collision';
+    this.state.activeSuperclusterId = null;
+    this.state.activeMemberClusterId = null;
+    this.state.godsEye = false;
+    this.state.currentScale = ScaleLevel.GALAXY_CLUSTER;
+
+    this.galaxyCollision.ensureModelInitialized();
+    if (presetChanged || rebuild) {
+      this.galaxyCollision.resetSimulation(nextPreset, this.state.density, this.state.collisionMassRatio);
+    }
+
+    this.updateLightingForScale(ScaleLevel.GALAXY_CLUSTER);
+    this.cameraCtrl?.releaseTracking();
+    this.cameraCtrl?.animateTo(0.58, 0.92, 82, [0, 0, 0], 1.35);
+    eventBus.emit({
+      type: 'SCALE_CHANGE',
+      from: ScaleLevel.GALAXY_CLUSTER,
+      to: ScaleLevel.GALAXY_CLUSTER,
+    });
+  }
+
+  /** Exit galaxy collision mode and return to the Local Group continuous zoom. */
+  public exitCollisionMode(): void {
+    this.state.collisionMode = false;
+    this.galaxyCollision.visible = false;
+    this.galaxyCollision.group.visible = false;
+    this.transitionToScale(ScaleLevel.GALAXY_CLUSTER);
+    this.cameraCtrl?.goToScale(ScaleLevel.GALAXY_CLUSTER);
+  }
+
   /** Select a named supercluster and frame its whole galaxy concentration. */
   public focusSupercluster(superclusterId: string): void {
     const sc = SUPERCLUSTERS.find((s) => s.id === superclusterId);
@@ -727,6 +819,10 @@ export class SceneManager {
     superclusterId?: string;
     position?: THREE.Vector3;
   } | null {
+    if (this.state.collisionMode) {
+      return null;
+    }
+
     const scale = this.state.currentScale;
     let targets: THREE.Object3D[] = [];
 

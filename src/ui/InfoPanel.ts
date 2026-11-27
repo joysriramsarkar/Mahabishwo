@@ -2,7 +2,7 @@
  * Right Info Panel — rich scientific telemetry, descriptions,
  * clickable child objects and NASA/ESA references.
  */
-import { AppState, ScaleLevel, StatItem, SuperclusterData } from '../core/types';
+import { AppState, CollisionPreset, ScaleLevel, StatItem, SuperclusterData } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
 import {
@@ -34,6 +34,10 @@ export class InfoPanel {
   }
 
   public update(): void {
+    if (this.state.collisionMode) {
+      this.renderCollisionDetail();
+      return;
+    }
     const activeSupercluster = this.state.activeSuperclusterId
       ? SUPERCLUSTERS.find((sc) => sc.id === this.state.activeSuperclusterId)
       : undefined;
@@ -99,41 +103,48 @@ export class InfoPanel {
         title = 'লোকাল গ্রুপ ছায়াপথ গোষ্ঠী';
         subtitle = 'The Local Group • ~10 Million Light-Years';
         desc =
-          '৮০টিরও বেশি ছায়াপথের মহাকর্ষীয় পরিবার—যার দুটি প্রধান দৈত্য হলো আমাদের আকাশগঙ্গা এবং অ্যান্ড্রোমিডা (M31)।';
+          '৮০টিরও বেশি ছায়াপথের মহাকর্ষীয় পরিবার—যার দুটি প্রধান দৈত্য হলো আমাদের আকাশগঙ্গা এবং অ্যান্ড্রোমিডা (M31), উষ্ণ IGM গ্যাস ফিলামেন্টে যুক্ত।';
         stats = [
           { label: 'মোট ছায়াপথ', value: '৮০+ ছায়াপথ' },
           { label: 'বৃহত্তম সদস্য', value: 'অ্যান্ড্রোমিডা (M31)' },
-          { label: 'সংঘর্ষ কাল', value: '~৪.৫ বিলিয়ন বছর পর' },
+          { label: 'সম্ভাব্য সংঘর্ষ', value: '~৪.৫–১০ বিলিয়ন বছর' },
         ];
-        listTitle = 'সদস্য ছায়াপথ';
-        listItems = GALAXIES.map((g) => ({
-          label: g.nameBn,
-          color: g.color,
-          onClick: () => {
-            if (g.id === 'milkyway') {
-              this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
-              this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
-            } else {
-              this.sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER, { galaxyId: g.id });
-              this.cameraCtrl.animateTo(0.55, 0.96, 130, g.position);
-            }
+        listTitle = 'সদস্য ছায়াপথে প্রবেশ ও সংঘর্ষ';
+        listItems = [
+          {
+            label: '💥 আকাশগঙ্গা–অ্যান্ড্রোমিডা সংঘর্ষ (ONNX AI)',
+            color: '#e879f9',
+            onClick: () => this.sceneManager.enterCollisionMode(),
           },
-        }));
+          ...GALAXIES.map((g) => ({
+            label:
+              g.id === 'andromeda'
+                ? '🌌 অ্যান্ড্রোমিডা (M31)-তে ডাইভ করুন'
+                : g.id === 'triangulum'
+                  ? '🌀 ত্রিভুজ ছায়াপথ (M33)-এ প্রবেশ'
+                  : g.nameBn,
+            color: g.color,
+            onClick: () => {
+              this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: g.id });
+              this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
+            },
+          })),
+        ];
         break;
 
       case ScaleLevel.GALAXY: {
         const mw = GALAXIES.find((g) => g.id === this.state.activeGalaxyId) || GALAXIES[0];
         title = mw.nameBn;
         subtitle = `${mw.name} • ${mw.type === 'barred-spiral' ? 'Barred Spiral' : mw.type === 'spiral' ? 'Spiral Galaxy' : mw.type === 'irregular' ? 'Irregular Galaxy' : 'Dwarf Galaxy'}`;
-        desc = mw.descriptionBn;
+        desc = `${mw.descriptionBn} সর্পিল বাহুতে চলছে সুপারনোভা বিস্ফোরণ ও O/B নীল দানব থেকে নিউট্রন তারার জীবনচক্র।`;
         accent = mw.color;
         stats = [
           { label: 'ব্যাস', value: `${toBn(mw.diameterKly)},০০০ আলোকবর্ষ` },
           { label: 'নক্ষত্র সংখ্যা', value: `${toBn(mw.starCountBillions)} বিলিয়ন+` },
-          { label: 'কেন্দ্রীয় ব্ল্যাক হোল', value: mw.hasBlackHole ? (mw.id === 'milkyway' ? 'স্যাজিটেরিয়াস এ*' : 'আছে') : 'নেই / অজানা' },
+          { label: 'কেন্দ্রীয় ব্ল্যাক হোল', value: mw.hasBlackHole ? (mw.id === 'milkyway' ? 'স্যাজিটেরিয়াস এ*' : mw.id === 'andromeda' ? 'M31-P3 (১৪ কোটি M☉)' : 'আছে') : 'নেই / অজানা' },
           { label: 'বয়স', value: `${toBn(mw.ageBillionYears)} বিলিয়ন বছর` },
         ];
-        listTitle = mw.id === 'milkyway' ? 'ছায়াপথের গুরুত্বপূর্ণ স্থান' : 'নেভিগেশন';
+        listTitle = mw.id === 'milkyway' ? 'গুরুত্বপূর্ণ স্থান ও অন্য ছায়াপথ' : 'ছায়াপথ নেভিগেশন';
         listItems = mw.id === 'milkyway' ? [
           {
             label: 'স্যাজিটেরিয়াস এ* (ব্ল্যাক হোল)',
@@ -149,6 +160,14 @@ export class InfoPanel {
             },
           },
           {
+            label: '🌌 অ্যান্ড্রোমিডা (M31)-তে ডাইভ করুন',
+            color: '#c084fc',
+            onClick: () => {
+              this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'andromeda' });
+              this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
+            },
+          },
+          {
             label: '🔴 প্রক্সিমা সেন্টরি মণ্ডল',
             color: '#fb7185',
             onClick: () => {
@@ -158,12 +177,17 @@ export class InfoPanel {
           },
         ] : [
           {
-            label: 'ছায়াপথ কেন্দ্রে ফোকাস করুন',
+            label: mw.id === 'andromeda' ? 'M31 দ্বৈত নিউক্লিয়াসে ফোকাস করুন' : 'ছায়াপথ কেন্দ্রে ফোকাস করুন',
             color: mw.color,
-            onClick: () => this.cameraCtrl.animateTo(0.55, 0.96, 68, [0, 0, 0]),
+            onClick: () => this.cameraCtrl.animateTo(0.55, 0.96, 56, [0, 0, 0]),
           },
           {
-            label: '✨ আকাশগঙ্গা ছায়াপথে যান',
+            label: '💥 আকাশগঙ্গা–অ্যান্ড্রোমিডা সংঘর্ষ (AI)',
+            color: '#e879f9',
+            onClick: () => this.sceneManager.enterCollisionMode(),
+          },
+          {
+            label: '✨ আকাশগঙ্গা ছায়াপথে ফিরুন',
             color: '#93c5fd',
             onClick: () => {
               this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
@@ -186,7 +210,10 @@ export class InfoPanel {
         const sys = STAR_SYSTEMS_CATALOG[this.state.activeSystemId || 'solar'];
         title = sys.nameBn;
         subtitle = sys.subtitleBn;
-        desc = sys.descriptionBn;
+        desc =
+          sys.id === 'solar'
+            ? `${sys.descriptionBn} গ্রহাণু বলয়, কুইপার বেল্ট, ওর্ট ক্লাউড ও উপবৃত্তাকার ধূমকেতুর লেজসহ পূর্ণ কক্ষপথ-সিস্টেম।`
+            : sys.descriptionBn;
         accent = sys.star.color;
         stats = sys.stats;
         sourceName = sys.sourceName;
@@ -488,15 +515,213 @@ export class InfoPanel {
   }
 
   // ------------------------------------------------------------------
+  // Milky Way + Andromeda ONNX Neural Gravity Collision Observatory
+  // ------------------------------------------------------------------
+  private renderCollisionDetail(): void {
+    const tel = this.sceneManager.galaxyCollision.getTelemetry();
+    const backendLabel =
+      tel.backend === 'webgpu'
+        ? 'ONNX WebGPU'
+        : tel.backend === 'wasm'
+        ? 'ONNX WASM SIMD'
+        : tel.backend === 'analytical'
+        ? 'Analytical Fallback'
+        : 'Loading ONNX...';
+
+    const presets: Array<{ id: CollisionPreset; label: string }> = [
+      { id: 'prograde', label: '🌀 মিল্কোমিডা' },
+      { id: 'headon', label: '💥 মুখোমুখি' },
+      { id: 'bridge', label: '🌉 টাইডাল ব্রিজ' },
+    ];
+
+    this.container.innerHTML = `
+      <div class="flex items-start justify-between gap-2 pb-2.5 border-b border-white/10">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:#e879f9; box-shadow:0 0 10px #e879f9"></span>
+            <h2 class="text-sm font-bold text-white truncate">আকাশগঙ্গা–অ্যান্ড্রোমিডা সংঘর্ষ</h2>
+          </div>
+          <p class="text-[11px] text-fuchsia-300/90 mt-0.5 truncate">Milkomeda • Physics-Informed MLP (ONNX)</p>
+        </div>
+        <button id="btn-close-info" type="button" aria-label="তথ্য প্যানেল বন্ধ করুন" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/10">✕</button>
+      </div>
+
+      <button id="btn-col-exit" type="button"
+        class="mt-2.5 w-full py-1.5 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-white/15 hover:text-white transition">
+        ← লোকাল গ্রুপে ফিরে যান
+      </button>
+
+      <p class="mt-2.5 text-xs text-slate-300 leading-relaxed">
+        PyTorch-এ ট্রেন করা Physics-Informed MLP মডেল এবং Symplectic Leapfrog ইন্টিগ্রেশন দিয়ে
+        ${toBn(tel.starCount.toLocaleString('en-IN'))}টি তারার পারস্পরিক মহাকর্ষ ও টাইডাল টেইল রিয়েল-টাইমে হিসাব হচ্ছে।
+      </p>
+
+      <div id="collision-telemetry"
+        class="mt-3 rounded-xl border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 py-2 space-y-1 text-[11px] text-slate-200">
+        <div class="flex items-center justify-between mb-0.5">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300">🧠 নিউরাল ইঞ্জিন টেলিমেট্রি</span>
+          <span id="col-backend" class="px-1.5 py-0.5 rounded bg-fuchsia-500/25 text-fuchsia-100 font-mono text-[10px]">${backendLabel}</span>
+        </div>
+        <div id="col-latency" class="flex justify-between"><span class="text-slate-400">ব্যাচ ইনফারেন্স সময়</span><span class="font-semibold text-white">${toBn(tel.inferenceMs.toFixed(2))} ms</span></div>
+        <div id="col-fidelity" class="flex justify-between"><span class="text-slate-400">নিউরাল ফিজিক্স নিখুঁততা</span><span class="font-semibold text-emerald-300">${toBn((tel.neuralCosineSim * 100).toFixed(2))}%</span></div>
+        <div id="col-time" class="flex justify-between"><span class="text-slate-400">অতিবাহিত সময়</span><span class="font-semibold text-white">${toBn(tel.elapsedGyr.toFixed(2))} বিলিয়ন বছর</span></div>
+        <div id="col-sep" class="flex justify-between"><span class="text-slate-400">দুই কোরের দূরত্ব</span><span class="font-semibold text-white">${toBn(Math.round(tel.coreSeparationKly))} হাজার আলোকবর্ষ</span></div>
+        <div id="col-speed" class="flex justify-between"><span class="text-slate-400">আপেক্ষিক গতি</span><span class="font-semibold text-white">${toBn(Math.round(tel.relativeSpeedKms))} কিমি/সে</span></div>
+      </div>
+
+      <div class="mt-3 space-y-2.5 pt-2.5 border-t border-white/10">
+        <div>
+          <div class="text-[11px] font-semibold text-sky-300 mb-1.5">সংঘর্ষের ধরন (Scenario)</div>
+          <div class="grid grid-cols-3 gap-1">
+            ${presets
+              .map(
+                (p) => `
+              <button type="button" data-col-preset="${p.id}"
+                class="col-preset-btn py-1.5 px-1 rounded-lg text-[10px] border transition ${
+                  this.state.collisionPreset === p.id
+                    ? 'bg-fuchsia-500/30 border-fuchsia-400/60 text-white font-semibold'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }">
+                ${p.label}
+              </button>`
+              )
+              .join('')}
+          </div>
+        </div>
+
+        <div>
+          <div class="text-[11px] font-semibold text-sky-300 mb-1.5">ফিজিক্স সলভার</div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button type="button" data-solver="neural"
+              class="col-solver-btn py-1.5 rounded-lg text-[11px] border transition ${
+                this.state.collisionPhysicsMode === 'neural'
+                  ? 'bg-sky-500/30 border-sky-400/60 text-white font-semibold'
+                  : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+              }">
+              🧠 ONNX Neural MLP
+            </button>
+            <button type="button" data-solver="analytical"
+              class="col-solver-btn py-1.5 rounded-lg text-[11px] border transition ${
+                this.state.collisionPhysicsMode === 'analytical'
+                  ? 'bg-amber-500/30 border-amber-400/60 text-white font-semibold'
+                  : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+              }">
+              📐 Exact Newton
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+            <span>অ্যান্ড্রোমিডা / আকাশগঙ্গা ভর অনুপাত</span>
+            <span id="col-mass-val" class="font-semibold text-fuchsia-200">${toBn(this.state.collisionMassRatio.toFixed(2))}×</span>
+          </div>
+          <input id="col-mass-slider" type="range" min="0.6" max="2.0" step="0.05"
+            value="${this.state.collisionMassRatio}" class="w-full h-1.5" />
+        </div>
+
+        <button id="btn-col-restart" type="button"
+          class="w-full py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-fuchsia-500/30 to-sky-500/30 border border-fuchsia-400/45 text-white hover:from-fuchsia-500/45 hover:to-sky-500/45 transition">
+          ↻ সংঘর্ষ পুনরায় শুরু করুন
+        </button>
+      </div>
+    `;
+
+    this.container.querySelector('#btn-close-info')?.addEventListener('click', () => {
+      this.state.showInfo = false;
+      this.container.classList.add('hidden');
+      document.body.classList.remove('info-open');
+      document.getElementById('btn-toggle-info')?.setAttribute('aria-expanded', 'false');
+    });
+
+    this.container.querySelector('#btn-col-exit')?.addEventListener('click', () => {
+      this.sceneManager.exitCollisionMode();
+    });
+
+    this.container.querySelectorAll<HTMLElement>('.col-preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.colPreset as CollisionPreset;
+        if (!preset) return;
+        this.state.collisionPreset = preset;
+        this.sceneManager.galaxyCollision.resetSimulation(
+          preset,
+          this.state.density,
+          this.state.collisionMassRatio
+        );
+        this.renderCollisionDetail();
+      });
+    });
+
+    this.container.querySelectorAll<HTMLElement>('.col-solver-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const solver = btn.dataset.solver as 'neural' | 'analytical';
+        if (!solver) return;
+        this.state.collisionPhysicsMode = solver;
+        this.renderCollisionDetail();
+      });
+    });
+
+    const massSlider = this.container.querySelector('#col-mass-slider') as HTMLInputElement | null;
+    const massVal = this.container.querySelector('#col-mass-val');
+    massSlider?.addEventListener('input', () => {
+      const val = parseFloat(massSlider.value);
+      this.state.collisionMassRatio = val;
+      this.sceneManager.galaxyCollision.setMassRatio(val);
+      if (massVal) massVal.textContent = `${toBn(val.toFixed(2))}×`;
+    });
+
+    this.container.querySelector('#btn-col-restart')?.addEventListener('click', () => {
+      this.sceneManager.galaxyCollision.resetSimulation(
+        this.state.collisionPreset,
+        this.state.density,
+        this.state.collisionMassRatio
+      );
+      this.renderCollisionDetail();
+    });
+  }
+
+  // ------------------------------------------------------------------
   // Live orbital telemetry (vis-viva), refreshed ~6x per second.
   // ------------------------------------------------------------------
   private lastTelemetryAt = 0;
 
   public updateTelemetry(): void {
-    const box = this.container.querySelector('#live-telemetry');
-    if (!box) return;
     const now = performance.now();
     if (now - this.lastTelemetryAt < 160) return;
+
+    if (this.state.collisionMode) {
+      const colBox = this.container.querySelector('#collision-telemetry');
+      if (!colBox) return;
+      this.lastTelemetryAt = now;
+      const tel = this.sceneManager.galaxyCollision.getTelemetry();
+      const backendEl = colBox.querySelector('#col-backend');
+      if (backendEl) {
+        backendEl.textContent =
+          tel.physicsMode === 'analytical'
+            ? 'Analytical Newton'
+            : tel.backend === 'webgpu'
+            ? 'ONNX WebGPU'
+            : tel.backend === 'wasm'
+            ? 'ONNX WASM SIMD'
+            : tel.backend === 'analytical'
+            ? 'Analytical Fallback'
+            : 'Loading ONNX...';
+      }
+      const setVal = (sel: string, txt: string) => {
+        const row = colBox.querySelector(sel);
+        const span = row?.querySelector('span:last-child');
+        if (span) span.textContent = txt;
+      };
+      setVal('#col-latency', `${toBn(tel.inferenceMs.toFixed(2))} ms`);
+      setVal('#col-fidelity', `${toBn((tel.neuralCosineSim * 100).toFixed(2))}%`);
+      setVal('#col-time', `${toBn(tel.elapsedGyr.toFixed(2))} বিলিয়ন বছর`);
+      setVal('#col-sep', `${toBn(Math.round(tel.coreSeparationKly))} হাজার আলোকবর্ষ`);
+      setVal('#col-speed', `${toBn(Math.round(tel.relativeSpeedKms))} কিমি/সে`);
+      return;
+    }
+
+    const box = this.container.querySelector('#live-telemetry');
+    if (!box) return;
     this.lastTelemetryAt = now;
 
     const sysId = this.state.activeSystemId || 'solar';

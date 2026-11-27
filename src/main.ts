@@ -13,7 +13,7 @@ import { Toasts } from './ui/Toasts';
 import { CosmicAudio } from './audio/CosmicAudio';
 import { AppState, ScaleLevel } from './core/types';
 import { eventBus } from './core/EventBus';
-import { SIM_DAYS_PER_SECOND, STAR_SYSTEMS_CATALOG, SUPERCLUSTERS } from './data/cosmicData';
+import { GALAXIES, SIM_DAYS_PER_SECOND, STAR_SYSTEMS_CATALOG, SUPERCLUSTERS } from './data/cosmicData';
 import {
   applyStoredPreferences,
   getStoredView,
@@ -33,6 +33,10 @@ export const state: AppState = {
   activeGalaxyId: 'milkyway',
   activeClusterId: 'local_group',
   activePreset: 'god-eye',
+  collisionMode: false,
+  collisionPreset: 'prograde',
+  collisionPhysicsMode: 'neural',
+  collisionMassRatio: 1.38,
   activeSuperclusterId: null,
   activeMemberClusterId: null,
   godsEye: false,
@@ -52,7 +56,7 @@ export const state: AppState = {
     cmb: true,
     darkMatter: false,
     habitableZones: true,
-    flowLines: false,
+    flowLines: true,
     dustLanes: true,
   },
   soundEnabled: false,
@@ -63,6 +67,8 @@ export const state: AppState = {
   photoMode: false,
   searchOpen: false,
   helpOpen: false,
+  compareOpen: false,
+  scaleVizOpen: false,
   bloom: 0.65,
   quality: 'high',
   autoRotate: false,
@@ -264,6 +270,16 @@ async function boot(): Promise<void> {
         break;
       }
 
+      case 'galaxy': {
+        const galaxyId = target.galaxyId || 'milkyway';
+        if (!GALAXIES.some((g) => g.id === galaxyId)) return;
+        state.activeGalaxyId = galaxyId;
+        state.activePreset = galaxyId === 'milkyway' ? 'milky-way' : 'local-group';
+        sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId });
+        cameraCtrl.goToScale(ScaleLevel.GALAXY);
+        break;
+      }
+
       case 'planet':
       case 'eye': {
         const systemId = target.systemId || 'solar';
@@ -320,12 +336,9 @@ async function boot(): Promise<void> {
         }
         break;
       case 'galaxy':
-        if (hit.id === 'milkyway') {
-          sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
+        if (hit.id) {
+          sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: hit.id });
           cameraCtrl.goToScale(ScaleLevel.GALAXY);
-        } else if (pos) {
-          sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER, { galaxyId: hit.id });
-          cameraCtrl.animateTo(0.55, 0.96, 130, [pos.x, pos.y, pos.z]);
         }
         break;
       case 'solar':

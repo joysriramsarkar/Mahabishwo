@@ -42,6 +42,8 @@ export class HelpOverlay {
             <div class="flex justify-between text-slate-300"><span>ফটো মোড</span><span class="kbd">F</span></div>
             <div class="flex justify-between text-slate-300"><span>স্ক্রিনশট</span><span class="kbd">P</span></div>
             <div class="flex justify-between text-slate-300"><span>টাইমলাইন</span><span class="kbd">T</span></div>
+            <div class="flex justify-between text-slate-300"><span>তুলনা মোড</span><span class="kbd">C</span></div>
+            <div class="flex justify-between text-slate-300"><span>স্কেল ভিজুয়ালাইজার</span><span class="kbd">V</span></div>
             <div class="flex justify-between text-slate-300"><span>রিসেট ক্যামেরা</span><span class="kbd">R</span></div>
             <div class="flex justify-between text-slate-300"><span>গাইড</span><span class="kbd">H</span></div>
             <div class="flex justify-between text-slate-300"><span>বন্ধ করুন</span><span class="kbd">Esc</span></div>

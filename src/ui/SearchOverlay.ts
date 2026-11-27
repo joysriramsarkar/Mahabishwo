@@ -5,7 +5,7 @@ import { AppState, ScaleLevel } from '../core/types';
 import { CameraController } from '../core/CameraController';
 import { SceneManager } from '../core/SceneManager';
 import { SearchEngine, SearchItem } from '../data/searchIndex';
-import { SUPERCLUSTERS, GALAXIES, STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
+import { SUPERCLUSTERS, STAR_SYSTEMS_CATALOG } from '../data/cosmicData';
 import { focusSoon, rememberFocus, restoreFocus, trapFocus } from '../utils/a11y';
 
 export class SearchOverlay {
@@ -154,18 +154,17 @@ export class SearchOverlay {
         break;
       }
       case ScaleLevel.GALAXY_CLUSTER:
-        this.sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER, { clusterId: item.clusterId });
-        this.cameraCtrl.goToScale(ScaleLevel.GALAXY_CLUSTER);
+        if (item.id === 'galaxy_collision') {
+          this.sceneManager.enterCollisionMode();
+        } else {
+          this.sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER, { clusterId: item.clusterId });
+          this.cameraCtrl.goToScale(ScaleLevel.GALAXY_CLUSTER);
+        }
         break;
       case ScaleLevel.GALAXY: {
-        if (item.galaxyId === 'milkyway') {
-          this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
-          this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
-        } else {
-          const g = GALAXIES.find((gl) => gl.id === item.galaxyId);
-          this.sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER);
-          this.cameraCtrl.animateTo(0.55, 0.96, 55, g ? g.position : [0, 0, 0]);
-        }
+        const galaxyId = item.galaxyId || 'milkyway';
+        this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId });
+        this.cameraCtrl.goToScale(ScaleLevel.GALAXY);
         break;
       }
       case ScaleLevel.STAR_SYSTEM: {

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { AppState, SceneLayer } from '../../core/types';
 import { SUPERCLUSTERS } from '../../data/cosmicData';
 import { buildStarData, createStarPoints, createGlowSprite } from '../helpers';
-import { mulberry32, gaussianRandom } from '../../utils/math';
+import { mulberry32, gaussianRandom, densityBrightness } from '../../utils/math';
 import { getSuperclusterMemberNodes } from '../superclusters';
 
 export class CosmicWebLayer implements SceneLayer {
@@ -17,6 +17,13 @@ export class CosmicWebLayer implements SceneLayer {
   private glows: THREE.Sprite[] = [];
   private glowBaseSizes: number[] = [];
   private filamentGroup = new THREE.Group();
+  private flowGroup = new THREE.Group();
+  private darkMatterGroup = new THREE.Group();
+  private flowCurves: THREE.QuadraticBezierCurve3[] = [];
+  private flowTracerPoints: THREE.Points | null = null;
+  private flowTracerPhases: Float32Array = new Float32Array(0);
+  private flowTracerCurves: Uint16Array = new Uint16Array(0);
+  private flowTracerMaterial: THREE.ShaderMaterial | null = null;
   private particleMaterial: THREE.ShaderMaterial | null = null;
 
   constructor() {
@@ -230,6 +237,107 @@ export class CosmicWebLayer implements SceneLayer {
     }
 
     this.group.add(this.filamentGroup);
+
+    // --- Boötes Void boundary wireframe sphere ---
+    const voidShell = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(voidRadius, 2),
+      new THREE.MeshBasicMaterial({
+        color: '#475569',
+        wireframe: true,
+        transparent: true,
+        opacity: 0.06,
+        depthWrite: false,
+      })
+    );
+    voidShell.position.copy(voidCenter);
+    this.filamentGroup.add(voidShell);
+
+    // --- Laniakea Gravitational Flow Lines (streamlines toward Great Attractor & Shapley) ---
+    const laniakea = SUPERCLUSTERS.find((s) => s.id === 'laniakea');
+    const attractorTarget = laniakea
+      ? new THREE.Vector3(...laniakea.position).add(new THREE.Vector3(18, -8, 12))
+      : new THREE.Vector3(18, -8, 12);
+
+    for (let i = 0; i < 16; i++) {
+      const th = (i / 16) * Math.PI * 2 + (rand() - 0.5) * 0.25;
+      const ph = Math.acos(2 * rand() - 1);
+      const r = 75 + rand() * 85;
+      const start = new THREE.Vector3(
+        attractorTarget.x + r * Math.sin(ph) * Math.cos(th),
+        attractorTarget.y + r * Math.cos(ph) * 0.65,
+        attractorTarget.z + r * Math.sin(ph) * Math.sin(th)
+      );
+      const mid = start.clone().lerp(attractorTarget, 0.52);
+      mid.x += gaussianRandom(rand) * 18;
+      mid.y += gaussianRandom(rand) * 12;
+      mid.z += gaussianRandom(rand) * 18;
+
+      const curve = new THREE.QuadraticBezierCurve3(start, mid, attractorTarget);
+      this.flowCurves.push(curve);
+      const linePts = curve.getPoints(36);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+      const lineCols = new Float32Array(linePts.length * 3);
+      const cStart = new THREE.Color('#38bdf8');
+      const cEnd = new THREE.Color('#fbbf24');
+      const cTmp = new THREE.Color();
+      for (let k = 0; k < linePts.length; k++) {
+        cTmp.copy(cStart).lerp(cEnd, k / (linePts.length - 1));
+        lineCols[k * 3] = cTmp.r;
+        lineCols[k * 3 + 1] = cTmp.g;
+        lineCols[k * 3 + 2] = cTmp.b;
+      }
+      lineGeo.setAttribute('color', new THREE.BufferAttribute(lineCols, 3));
+      const flowLine = new THREE.Line(
+        lineGeo,
+        new THREE.LineBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.34,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      flowLine.frustumCulled = false;
+      this.flowGroup.add(flowLine);
+    }
+
+    const tracerTotal = this.flowCurves.length * 10;
+    this.flowTracerPhases = new Float32Array(tracerTotal);
+    this.flowTracerCurves = new Uint16Array(tracerTotal);
+    const tracerData = buildStarData(tracerTotal, (idx) => {
+      const cIdx = idx % this.flowCurves.length;
+      const phase = rand();
+      this.flowTracerCurves[idx] = cIdx;
+      this.flowTracerPhases[idx] = phase;
+      const p = this.flowCurves[cIdx].getPoint(phase);
+      return {
+        pos: [p.x, p.y, p.z],
+        color: new THREE.Color(phase > 0.6 ? '#fde68a' : '#7dd3fc'),
+        size: 0.95 + rand() * 0.5,
+        seed: rand(),
+      };
+    });
+    const tracers = createStarPoints(tracerData, 1.35);
+    this.flowTracerPoints = tracers.points;
+    this.flowTracerMaterial = tracers.material;
+    this.flowGroup.add(tracers.points);
+    this.group.add(this.flowGroup);
+
+    // --- Dark Matter Halos enveloping superclusters & web nodes ---
+    SUPERCLUSTERS.filter((s) => s.id !== 'bootes_void').forEach((sc) => {
+      const dmHalo = createGlowSprite('#7c3aed', 36 + sc.radiusMly * 0.18, 0.28, '#a855f7');
+      dmHalo.position.set(...sc.position);
+      this.darkMatterGroup.add(dmHalo);
+    });
+    webNodes.slice(0, 18).forEach((wn) => {
+      if (!wn.major) {
+        const subDm = createGlowSprite('#6366f1', 18, 0.22, '#818cf8');
+        subDm.position.copy(wn.pos);
+        this.darkMatterGroup.add(subDm);
+      }
+    });
+    this.darkMatterGroup.visible = false;
+    this.group.add(this.darkMatterGroup);
   }
 
   public build(): void {
@@ -238,17 +346,53 @@ export class CosmicWebLayer implements SceneLayer {
 
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
+    const ageNorm = THREE.MathUtils.clamp(state.cosmicAge / 13.8, 0, 1);
+    const expansionScale = 0.65 + 0.35 * Math.pow(Math.max(0.05, ageNorm), 0.6);
+    const maturity = THREE.MathUtils.smoothstep(state.cosmicAge, 0.15, 2.5);
+
+    this.group.scale.setScalar(expansionScale);
     this.group.rotation.y += dt * 0.008 * Math.min(state.rotationSpeed, 6);
-    this.filamentGroup.visible = state.layers.cosmicWeb;
+    this.filamentGroup.visible = state.layers.cosmicWeb && maturity > 0.02;
+    this.flowGroup.visible = state.layers.flowLines && maturity > 0.08;
+    this.darkMatterGroup.visible = state.layers.darkMatter && maturity > 0.05;
+
     if (this.particleMaterial) {
       this.particleMaterial.uniforms.uTime.value = state.elapsedTime;
       this.particleMaterial.uniforms.uScale.value =
         0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+      this.particleMaterial.uniforms.uBrightness.value =
+        densityBrightness(state.density) * (0.2 + 0.8 * maturity);
     }
+
+    if (this.flowTracerPoints && this.flowTracerMaterial && this.flowGroup.visible) {
+      const posAttr = this.flowTracerPoints.geometry.attributes.position as THREE.BufferAttribute;
+      const arr = posAttr.array as Float32Array;
+      const tmpPt = new THREE.Vector3();
+      const flowAdvance = state.isPlaying ? dt * 0.14 * Math.min(state.rotationSpeed, 4) : 0;
+      for (let i = 0; i < this.flowTracerPhases.length; i++) {
+        let p = this.flowTracerPhases[i] + flowAdvance;
+        if (p > 1) p -= 1;
+        this.flowTracerPhases[i] = p;
+        this.flowCurves[this.flowTracerCurves[i]].getPoint(p, tmpPt);
+        const off = i * 3;
+        arr[off] = tmpPt.x;
+        arr[off + 1] = tmpPt.y;
+        arr[off + 2] = tmpPt.z;
+      }
+      posAttr.needsUpdate = true;
+      this.flowTracerMaterial.uniforms.uTime.value = state.elapsedTime;
+      this.flowTracerMaterial.uniforms.uScale.value =
+        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+    }
+
     const pulse = 1 + Math.sin(state.elapsedTime * 0.8) * 0.06;
     this.glows.forEach((g, i) => {
       const base = this.glowBaseSizes[i] || 1;
-      g.scale.set(base * pulse, base * pulse, 1);
+      g.scale.set(
+        base * pulse * Math.max(0.25, maturity),
+        base * pulse * Math.max(0.25, maturity),
+        1
+      );
     });
   }
 

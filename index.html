@@ -12,9 +12,18 @@
   <meta property="og:type" content="website" />
   <style>
     /* Critical fallback: overlays must stay hidden even if the Tailwind
-       bundle fails to load. Without this, the WebGL error card is visible
-       from the start and looks like a graphics failure. */
-    .hidden {
+       bundle fails to load, without clobbering responsive `hidden sm:flex` buttons. */
+    #webgl-fallback.hidden,
+    #search-overlay.hidden,
+    #help-overlay.hidden,
+    #compare-overlay.hidden,
+    #scale-viz-panel.hidden,
+    #tour-panel.hidden,
+    #controls-drawer.hidden,
+    #timeline-panel.hidden,
+    #minimap-canvas.hidden,
+    #photo-actions.hidden,
+    #info-panel.hidden {
       display: none !important;
     }
     html,
@@ -106,6 +115,14 @@
 
   <!-- Help & Shortcuts Overlay -->
   <div id="help-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden"></div>
+
+  <!-- Comparison Mode Overlay -->
+  <div id="compare-overlay" role="dialog" aria-modal="true" aria-labelledby="compare-title"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden"></div>
+
+  <!-- Logarithmic Scale Visualizer Overlay -->
+  <div id="scale-viz-panel" role="dialog" aria-modal="true" aria-labelledby="scale-viz-title"
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden"></div>
 
   <!-- Guided Tour Card -->

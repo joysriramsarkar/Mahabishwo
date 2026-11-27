@@ -49,6 +49,8 @@ export class ControlsPanel {
       { key: 'labels', label: 'নাম ও ল্যান্ডমার্ক পিন' },
       { key: 'nebulae', label: 'নীহারিকা ও তারাগঠন অঞ্চল' },
       { key: 'cosmicWeb', label: 'কসমিক ওয়েব ফিলামেন্ট' },
+      { key: 'flowLines', label: 'মহাজাগতিক প্রবাহ রেখা (Flow)' },
+      { key: 'darkMatter', label: 'ডার্ক ম্যাটার হ্যালো ও ডার্ক এনার্জি' },
       { key: 'cmb', label: 'CMB / মহাজাগতিক দিগন্ত' },
       { key: 'dustLanes', label: 'ছায়াপথ ধূলিস্তর' },
       { key: 'halo', label: 'গ্লোবুলার ক্লাস্টার হ্যালো' },

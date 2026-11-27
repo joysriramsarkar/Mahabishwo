@@ -13,6 +13,8 @@ import { TimelinePanel } from './TimelinePanel';
 import { Minimap } from './Minimap';
 import { SearchOverlay } from './SearchOverlay';
 import { HelpOverlay } from './HelpOverlay';
+import { CompareOverlay } from './CompareOverlay';
+import { ScaleVisualizer } from './ScaleVisualizer';
 import { LabelsLayer } from './LabelsLayer';
 import { Toasts } from './Toasts';
 import { Tour } from './Tour';
@@ -32,6 +34,8 @@ export class UIManager {
   public minimap: Minimap;
   public searchOverlay: SearchOverlay;
   public helpOverlay: HelpOverlay;
+  public compareOverlay: CompareOverlay;
+  public scaleVisualizer: ScaleVisualizer;
   public labelsLayer: LabelsLayer;
   public tour: Tour;
 
@@ -47,6 +51,8 @@ export class UIManager {
     this.minimap = new Minimap(state, cameraCtrl);
     this.searchOverlay = new SearchOverlay(state, cameraCtrl, sceneManager);
     this.helpOverlay = new HelpOverlay(state);
+    this.compareOverlay = new CompareOverlay(state, cameraCtrl, sceneManager);
+    this.scaleVisualizer = new ScaleVisualizer(state, cameraCtrl, sceneManager);
     this.labelsLayer = new LabelsLayer(state, sceneManager, cameraCtrl);
     this.tour = new Tour((preset) => this.applyPreset(preset));
 
@@ -126,6 +132,7 @@ export class UIManager {
       { id: 'god-eye', label: "🌌 God's Eye", cls: 'text-sky-200 hover:bg-sky-500/20 font-semibold', active: true },
       { id: 'cosmic-web', label: '🕸️ কসমিক ওয়েব', cls: 'text-slate-200 hover:bg-white/10' },
       { id: 'local-group', label: '🌀 লোকাল গ্রুপ', cls: 'text-slate-200 hover:bg-white/10' },
+      { id: 'collision', label: '💥 গ্যালাক্সি সংঘর্ষ', cls: 'text-fuchsia-200 hover:bg-fuchsia-500/20 font-semibold' },
       { id: 'milky-way', label: '✨ আকাশগঙ্গা', cls: 'text-slate-200 hover:bg-white/10' },
       { id: 'sep', label: '' },
       { id: 'solar', label: '☀️ সৌরজগৎ', cls: 'text-amber-200 hover:bg-amber-500/20 font-semibold' },
@@ -186,6 +193,10 @@ export class UIManager {
       case 'local-group':
         this.sceneManager.transitionToScale(ScaleLevel.GALAXY_CLUSTER);
         this.cameraCtrl.goToScale(ScaleLevel.GALAXY_CLUSTER);
+        break;
+      case 'collision':
+        this.sceneManager.enterCollisionMode();
+        Toasts.show('🧠 ONNX Neural Gravity + Leapfrog সিমুলেশন চালু', 2800);
         break;
       case 'milky-way':
         this.sceneManager.transitionToScale(ScaleLevel.GALAXY, { galaxyId: 'milkyway' });
@@ -254,6 +265,8 @@ export class UIManager {
 
   private bindToolbarEvents(): void {
     document.getElementById('btn-search')?.addEventListener('click', () => this.searchOverlay.open());
+    document.getElementById('btn-compare')?.addEventListener('click', () => this.compareOverlay.toggle());
+    document.getElementById('btn-scale-viz')?.addEventListener('click', () => this.scaleVisualizer.toggle());
     document.getElementById('btn-tour')?.addEventListener('click', () => this.tour.start());
     document.getElementById('btn-share')?.addEventListener('click', () => void this.shareView());
 
@@ -351,6 +364,10 @@ export class UIManager {
         this.togglePhotoMode();
       } else if (e.key.toLowerCase() === 't') {
         this.setPanelVisibility('timeline', !this.state.showTimeline);
+      } else if (e.key.toLowerCase() === 'c') {
+        this.compareOverlay.toggle();
+      } else if (e.key.toLowerCase() === 'v') {
+        this.scaleVisualizer.toggle();
       } else if (e.key.toLowerCase() === 'h' || e.key === '?') {
         this.helpOverlay.toggle();
       } else if (e.key.toLowerCase() === 'r') {
@@ -359,6 +376,8 @@ export class UIManager {
       } else if (e.key === 'Escape') {
         if (this.tour.isOpen) return; // Tour owns Escape while it is open.
         if (this.state.searchOpen) this.searchOverlay.close();
+        else if (this.state.compareOpen) this.compareOverlay.close();
+        else if (this.state.scaleVizOpen) this.scaleVisualizer.close();
         else if (this.state.helpOpen) this.helpOverlay.close();
         else if (this.state.photoMode) this.togglePhotoMode();
         else if (this.state.showControls) this.setPanelVisibility('controls', false);
@@ -385,7 +404,9 @@ export class UIManager {
       [ScaleLevel.GALAXY]: 'milky-way',
       [ScaleLevel.STAR_SYSTEM]: this.state.activeSystemId === 'trappist' ? 'trappist' : 'solar',
     };
-    if (to === ScaleLevel.PLANET || to === ScaleLevel.SURFACE) {
+    if (this.state.collisionMode) {
+      this.setActivePill('collision');
+    } else if (to === ScaleLevel.PLANET || to === ScaleLevel.SURFACE) {
       if (this.state.godsEye && this.state.activePlanetId === 'earth') {
         this.setActivePill('earth-gods-eye');
       } else if (this.state.activePlanetId === 'earth') this.setActivePill('earth');

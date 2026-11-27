@@ -26,6 +26,7 @@ import {
   createOrbitLine,
   createRingMesh,
   createAtmosphere,
+  createGlowSprite,
   disposeObject,
   enablePlanetSurfaceEffects,
   updatePlanetCloudShadowMap,
@@ -57,12 +58,25 @@ export interface ActivePlanetItem {
   eccentricity: number;
 }
 
-/** One Keplerian asteroid-belt band: drawn as points, rotating at its own real rate. */
+/** One Keplerian asteroid/Kuiper-belt band: drawn as points, rotating at its own real rate. */
 interface BeltBand {
   points: THREE.Points;
   material: THREE.ShaderMaterial;
   /** Angular velocity in rad per simulated day from Kepler's third law. */
   rate: number;
+}
+
+interface ActiveComet {
+  planeGroup: THREE.Group;
+  bodyGroup: THREE.Group;
+  comaGlow: THREE.Sprite;
+  ionTail: THREE.Mesh;
+  dustTail: THREE.Mesh;
+  orbitMaterial: THREE.ShaderMaterial;
+  semiMajor: number;
+  eccentricity: number;
+  meanAnomaly: number;
+  angularSpeed: number;
 }
 
 /** Solve Kepler's equation M = E - e·sin(E) for the eccentric anomaly. */
@@ -138,6 +152,9 @@ export class StarSystemLayer implements SceneLayer {
   private orbitLinesGroup = new THREE.Group();
   private hzMesh: THREE.Mesh | null = null;
   private beltBands: BeltBand[] = [];
+  private oortPoints: THREE.Points | null = null;
+  private oortMaterial: THREE.ShaderMaterial | null = null;
+  public comets: ActiveComet[] = [];
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -158,6 +175,9 @@ export class StarSystemLayer implements SceneLayer {
     this.planets = [];
     this.hzMesh = null;
     this.beltBands = [];
+    this.oortPoints = null;
+    this.oortMaterial = null;
+    this.comets = [];
     this.group.add(this.orbitLinesGroup);
 
     this.activeSystemId = systemId;
@@ -283,6 +303,124 @@ export class StarSystemLayer implements SceneLayer {
         const { points, material } = createStarPoints(data, 0.6);
         this.group.add(points);
         this.beltBands.push({ points, material, rate: TWO_PI / band.periodDays });
+      });
+
+      // 3b. Kuiper Belt beyond Neptune (icy trans-Neptunian belt, ~30-50 AU analog)
+      const kuiperBands = [
+        { from: 66.0, to: 74.0, count: 950, periodDays: 88000 },
+        { from: 74.0, to: 82.0, count: 850, periodDays: 118000 },
+      ];
+      kuiperBands.forEach((band) => {
+        const data = buildStarData(band.count, () => {
+          const r = band.from + rand() * (band.to - band.from);
+          const a = rand() * Math.PI * 2;
+          const shade = 0.4 + rand() * 0.35;
+          return {
+            pos: [
+              Math.cos(a) * r + gaussianRandom(rand) * 0.9,
+              gaussianRandom(rand) * 1.1,
+              Math.sin(a) * r + gaussianRandom(rand) * 0.9,
+            ],
+            color: new THREE.Color(shade * 0.68, shade * 0.86, shade),
+            size: 0.26 + rand() * 0.42,
+            seed: rand(),
+          };
+        });
+        const { points, material } = createStarPoints(data, 0.65);
+        this.group.add(points);
+        this.beltBands.push({ points, material, rate: TWO_PI / band.periodDays });
+      });
+
+      // 3c. Outer Oort Cloud spherical halo of icy planetesimals
+      const oortData = buildStarData(1300, () => {
+        const r = 104 + rand() * 34;
+        const th = rand() * Math.PI * 2;
+        const ph = Math.acos(2 * rand() - 1);
+        return {
+          pos: [
+            r * Math.sin(ph) * Math.cos(th),
+            r * Math.cos(ph),
+            r * Math.sin(ph) * Math.sin(th),
+          ],
+          color: new THREE.Color('#93c5fd').multiplyScalar(0.35 + rand() * 0.3),
+          size: 0.28 + rand() * 0.36,
+          seed: rand(),
+        };
+      });
+      const oort = createStarPoints(oortData, 0.55);
+      this.oortPoints = oort.points;
+      this.oortMaterial = oort.material;
+      this.group.add(oort.points);
+
+      // 3d. Eccentric Comet (1P/Halley analog) with dynamic anti-sunward tails
+      const cometSemiMajor = 38.0;
+      const cometEcc = 0.78;
+      const cometPlane = new THREE.Group();
+      cometPlane.rotation.set(0.28, 0.42, -0.18);
+      this.group.add(cometPlane);
+
+      const cometOrbitPlane = new THREE.Group();
+      cometOrbitPlane.rotation.copy(cometPlane.rotation);
+      const cometOrbitLine = createOrbitLine(cometSemiMajor, '#38bdf8', 0.44, 220, 0.5, cometEcc);
+      cometOrbitPlane.add(cometOrbitLine);
+      this.orbitLinesGroup.add(cometOrbitPlane);
+
+      // Keep comet body inside cometPlane (attached to this.group) so toggling orbits never hides the comet
+      const cometBody = new THREE.Group();
+      cometPlane.add(cometBody);
+
+      const nucleus = new THREE.Mesh(
+        new THREE.SphereGeometry(0.26, 16, 16),
+        new THREE.MeshBasicMaterial({ color: '#f8fafc' })
+      );
+      cometBody.add(nucleus);
+
+      const comaGlow = createGlowSprite('#7dd3fc', 2.4, 0.85, '#ffffff');
+      cometBody.add(comaGlow);
+
+      const ionGeo = new THREE.ConeGeometry(0.45, 7.5, 16, 1, true);
+      ionGeo.translate(0, 3.75, 0);
+      ionGeo.rotateX(Math.PI / 2);
+      const ionTail = new THREE.Mesh(
+        ionGeo,
+        new THREE.MeshBasicMaterial({
+          color: '#38bdf8',
+          transparent: true,
+          opacity: 0.38,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      cometBody.add(ionTail);
+
+      const dustGeo = new THREE.ConeGeometry(0.75, 5.2, 16, 1, true);
+      dustGeo.translate(0, 2.6, 0);
+      dustGeo.rotateX(Math.PI / 2);
+      const dustTail = new THREE.Mesh(
+        dustGeo,
+        new THREE.MeshBasicMaterial({
+          color: '#fde68a',
+          transparent: true,
+          opacity: 0.24,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      cometBody.add(dustTail);
+
+      this.comets.push({
+        planeGroup: cometPlane,
+        bodyGroup: cometBody,
+        comaGlow,
+        ionTail,
+        dustTail,
+        orbitMaterial: cometOrbitLine.material as THREE.ShaderMaterial,
+        semiMajor: cometSemiMajor,
+        eccentricity: cometEcc,
+        meanAnomaly: 0.45,
+        angularSpeed: TWO_PI / 2800,
       });
     }
 
@@ -508,6 +646,28 @@ export class StarSystemLayer implements SceneLayer {
       });
       p.orbitMaterial.uniforms.uHeadAngle.value = E;
     });
+
+    this.comets.forEach((c) => {
+      c.meanAnomaly += dtDays * c.angularSpeed;
+      const E = solveEccentricAnomaly(c.meanAnomaly, c.eccentricity);
+      const a = c.semiMajor;
+      const b = a * Math.sqrt(1 - c.eccentricity * c.eccentricity);
+      const x = Math.cos(E) * a - a * c.eccentricity;
+      const z = -Math.sin(E) * b;
+      c.bodyGroup.position.set(x, 0, z);
+      c.orbitMaterial.uniforms.uHeadAngle.value = E;
+
+      // Orient tails radially outward from the Sun in planeGroup coordinates
+      const rDist = Math.max(4, Math.hypot(x, z));
+      const solarFactor = THREE.MathUtils.clamp(28 / rDist, 0.35, 1.9);
+      const antiSunYaw = Math.atan2(x, z);
+      c.ionTail.rotation.y = antiSunYaw;
+      c.dustTail.rotation.y = antiSunYaw + 0.14;
+      c.ionTail.scale.set(1, 1, solarFactor);
+      c.dustTail.scale.set(1, 1, solarFactor * 0.85);
+      const comaScale = 1.6 + solarFactor * 1.1;
+      c.comaGlow.scale.set(comaScale, comaScale, 1);
+    });
   }
 
   /** Visual/cosmetic updates only — cheap, gated on layer visibility. */
@@ -527,13 +687,21 @@ export class StarSystemLayer implements SceneLayer {
     if (this.prominenceMesh && this.prominenceMaterial) {
       this.prominenceMaterial.uniforms.uTime.value = state.elapsedTime;
     }
+    const ptScale = 0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
     this.beltBands.forEach((band) => {
       band.material.uniforms.uTime.value = state.elapsedTime;
-      band.material.uniforms.uScale.value =
-        0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
+      band.material.uniforms.uScale.value = ptScale;
     });
+    if (this.oortPoints && this.oortMaterial) {
+      this.oortPoints.visible = state.layers.stars;
+      this.oortMaterial.uniforms.uTime.value = state.elapsedTime;
+      this.oortMaterial.uniforms.uScale.value = ptScale;
+    }
 
     this.orbitLinesGroup.visible = state.layers.orbits;
+    this.comets.forEach((c) => {
+      c.orbitMaterial.uniforms.uOpacity.value = state.layers.orbits ? 0.44 : 0.0;
+    });
     if (this.hzMesh) {
       this.hzMesh.visible = state.layers.orbits && state.layers.habitableZones;
     }

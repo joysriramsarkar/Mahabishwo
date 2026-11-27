@@ -324,6 +324,10 @@ export class CameraController {
     this.trackingObject = null;
     this.trackingOffset.set(0, 0, 0);
     this.flyFollowObj = null;
+    if (this.state.collisionMode) {
+      this.animateTo(0.58, 0.92, 82, [0, 0, 0], 1.2);
+      return;
+    }
     const cfg = SCALE_CONFIGS[this.state.currentScale];
     this.animateTo(cfg.defaultTheta, cfg.defaultPhi, cfg.defaultRadius, [0, 0, 0], 1.2);
   }

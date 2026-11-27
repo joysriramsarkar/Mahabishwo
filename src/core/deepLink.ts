@@ -3,6 +3,7 @@
  *
  * Hash routes are intentionally human-readable and stable:
  *   #view/earth
+ *   #galaxy/andromeda
  *   #system/trappist
  *   #planet/solar/earth
  *   #eye/solar/earth
@@ -13,11 +14,12 @@
  */
 import { AppState, ScaleLevel } from './types';
 
-export type DeepLinkKind = 'view' | 'system' | 'planet' | 'eye' | 'supercluster' | 'member';
+export type DeepLinkKind = 'view' | 'galaxy' | 'system' | 'planet' | 'eye' | 'supercluster' | 'member';
 
 export interface DeepLinkTarget {
   kind: DeepLinkKind;
   preset?: string;
+  galaxyId?: string;
   systemId?: string;
   planetId?: string;
   superclusterId?: string;
@@ -55,6 +57,9 @@ export function parseDeepLink(hash: string = window.location.hash): DeepLinkTarg
         return { kind: 'member', superclusterId: parts[1], memberId: parts[2] };
       }
       break;
+    case 'galaxy':
+      if (parts[1]) return { kind: 'galaxy', galaxyId: parts[1] };
+      break;
     case 'planet':
       if (parts[1] && parts[2]) {
         return { kind: 'planet', systemId: parts[1], planetId: parts[2] };
@@ -80,6 +85,9 @@ export function parseDeepLink(hash: string = window.location.hash): DeepLinkTarg
 
 /** Build the canonical hash for the current view. */
 export function buildDeepLink(state: AppState): string {
+  if (state.collisionMode) {
+    return '#view/collision';
+  }
   const systemId = encodeURIComponent(state.activeSystemId || 'solar');
   const planetId = encodeURIComponent(state.activePlanetId || 'earth');
 
@@ -96,6 +104,9 @@ export function buildDeepLink(state: AppState): string {
   }
   if (state.currentScale === ScaleLevel.STAR_SYSTEM) {
     return `#system/${systemId}`;
+  }
+  if (state.currentScale === ScaleLevel.GALAXY && state.activeGalaxyId && state.activeGalaxyId !== 'milkyway') {
+    return `#galaxy/${encodeURIComponent(state.activeGalaxyId)}`;
   }
 
   const preset = PRESET_BY_SCALE[state.currentScale] ?? state.activePreset ?? 'god-eye';

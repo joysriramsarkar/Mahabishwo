@@ -66,6 +66,7 @@ export class LocalGroupLayer implements SceneLayer {
   public pickTargets: THREE.Object3D[] = [];
 
   private haloGroup = new THREE.Group();
+  private igmGroup = new THREE.Group();
   private starMaterials: THREE.ShaderMaterial[] = [];
   private glows: THREE.Sprite[] = [];
   private glowBaseSizes: number[] = [];
@@ -212,6 +213,66 @@ export class LocalGroupLayer implements SceneLayer {
     });
 
     this.group.add(this.haloGroup);
+
+    // --- Inter-Galactic Medium (IGM) warm ionized plasma filament bridges ---
+    const byId = new Map(GALAXIES.map((g) => [g.id, new THREE.Vector3(...g.position)]));
+    const bridges: Array<[string, string, string, number]> = [
+      ['milkyway', 'andromeda', '#818cf8', 0.24],
+      ['andromeda', 'triangulum', '#a78bfa', 0.18],
+      ['milkyway', 'lmc', '#f472b6', 0.2],
+      ['lmc', 'smc', '#fb7185', 0.22],
+    ];
+    const igmParticles: Array<{ pos: THREE.Vector3; col: THREE.Color; size: number }> = [];
+    bridges.forEach(([idA, idB, hex, opacity]) => {
+      const a = byId.get(idA);
+      const b = byId.get(idB);
+      if (!a || !b) return;
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      mid.y += (rand() - 0.5) * 4;
+      const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+      const pts = curve.getPoints(36);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      const line = new THREE.Line(
+        lineGeo,
+        new THREE.LineBasicMaterial({
+          color: hex,
+          transparent: true,
+          opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      line.frustumCulled = false;
+      this.igmGroup.add(line);
+
+      const bridgeColor = new THREE.Color(hex);
+      const count = idA === 'milkyway' && idB === 'andromeda' ? 140 : 75;
+      for (let k = 0; k < count; k++) {
+        const t = rand();
+        const pt = curve.getPoint(t);
+        const spread = 1.4 + Math.sin(t * Math.PI) * 2.8;
+        pt.x += gaussianRandom(rand) * spread;
+        pt.y += gaussianRandom(rand) * spread * 0.7;
+        pt.z += gaussianRandom(rand) * spread;
+        igmParticles.push({
+          pos: pt,
+          col: bridgeColor.clone().multiplyScalar(0.45 + rand() * 0.45),
+          size: 0.4 + rand() * 0.65,
+        });
+      }
+    });
+    if (igmParticles.length > 0) {
+      const igmData = buildStarData(igmParticles.length, (i) => ({
+        pos: [igmParticles[i].pos.x, igmParticles[i].pos.y, igmParticles[i].pos.z],
+        color: igmParticles[i].col,
+        size: igmParticles[i].size,
+        seed: rand(),
+      }));
+      const { points, material } = createStarPoints(igmData, 0.55);
+      this.starMaterials.push(material);
+      this.igmGroup.add(points);
+    }
+    this.group.add(this.igmGroup);
   }
 
   public build(): void {
@@ -221,6 +282,7 @@ export class LocalGroupLayer implements SceneLayer {
   public update(dt: number, state: AppState): void {
     if (!this.visible) return;
     this.group.rotation.y += dt * 0.01 * Math.min(state.rotationSpeed, 6);
+    this.igmGroup.visible = state.layers.nebulae || state.layers.cosmicWeb;
     const scale = 0.16 * window.innerHeight * Math.min(window.devicePixelRatio || 1, 2);
     for (const mat of this.starMaterials) {
       mat.uniforms.uTime.value = state.elapsedTime;

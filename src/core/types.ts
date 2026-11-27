@@ -295,6 +295,8 @@ export interface StatItem {
 // ===================================================================
 export type DensityLevel = 'low' | 'medium' | 'high';
 export type QualityLevel = 'low' | 'medium' | 'high';
+export type CollisionPreset = 'prograde' | 'headon' | 'bridge';
+export type CollisionPhysicsMode = 'neural' | 'analytical';
 
 export interface AppState {
   currentScale: ScaleLevel;
@@ -304,6 +306,11 @@ export interface AppState {
   activeGalaxyId: string;
   activeClusterId: string;
   activePreset: string;
+  /** True when the interactive Milky Way + Andromeda ONNX collision simulation is active. */
+  collisionMode: boolean;
+  collisionPreset: CollisionPreset;
+  collisionPhysicsMode: CollisionPhysicsMode;
+  collisionMassRatio: number;
   /** Selected supercluster / member cluster for the cosmic-web detail panel. */
   activeSuperclusterId: string | null;
   activeMemberClusterId: string | null;
@@ -329,6 +336,8 @@ export interface AppState {
   photoMode: boolean;
   searchOpen: boolean;
   helpOpen: boolean;
+  compareOpen: boolean;
+  scaleVizOpen: boolean;
   bloom: number;
   quality: QualityLevel;
   autoRotate: boolean;
@@ -400,4 +409,5 @@ export interface ProjectedPin {
   worldPos: THREE.Vector3;
   onClick: () => void;
   kind?: 'supercluster' | 'member' | 'landmark';
+  yOffset?: number;
 }
